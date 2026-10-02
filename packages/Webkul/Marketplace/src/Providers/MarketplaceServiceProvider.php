@@ -3,19 +3,37 @@
 namespace Webkul\Marketplace\Providers;
 
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Webkul\Marketplace\Http\Middleware\EnsureVendorContext;
 use Webkul\Marketplace\Models\Vendor;
 use Webkul\Marketplace\Policies\VendorPolicy;
 
 /**
- * Registers the vendor-scoped authorization boundary. Kept separate from
- * ModuleServiceProvider (which Concord uses purely for migrations/models), same
- * pattern as Paymob's ModuleServiceProvider -> PaymobServiceProvider split.
+ * Registers the vendor-scoped authorization boundary, routes, views and ACL.
+ * Kept separate from ModuleServiceProvider (which Concord uses purely for
+ * migrations/models), same pattern as Paymob's ModuleServiceProvider ->
+ * PaymobServiceProvider split. Routes are loaded manually here (not via
+ * Concord's route auto-loading) for consistency with B2BSuiteServiceProvider's
+ * own manual `Route::middleware('web')->group(...)` precedent.
  */
 class MarketplaceServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        $this->mergeConfigFrom(dirname(__DIR__).'/Config/admin/acl.php', 'acl');
+    }
+
     public function boot(): void
     {
         Gate::policy(Vendor::class, VendorPolicy::class);
+
+        $this->app['router']->aliasMiddleware('vendor.context', EnsureVendorContext::class);
+
+        Route::middleware('web')->group(dirname(__DIR__).'/Routes/web.php');
+
+        $this->loadViewsFrom(dirname(__DIR__).'/Resources/views', 'marketplace');
+
+        $this->loadTranslationsFrom(dirname(__DIR__).'/Resources/lang', 'marketplace');
     }
 }

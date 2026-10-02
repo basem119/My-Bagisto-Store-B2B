@@ -67,4 +67,24 @@ class Vendor extends Model implements VendorContract
     {
         return $this->status === VendorStatus::ACTIVE;
     }
+
+    /**
+     * Konekt Concord auto-registers an explicit route-model binder for every
+     * concord model keyed by its short name (here "vendor"), and that
+     * explicit binder always calls `resolveRouteBinding($value)` WITHOUT a
+     * field — it never sees the `{vendor:slug}` binding field declared on
+     * the vendor-portal routes. Disambiguate by shape instead: numeric
+     * values are the vendor's primary key (used by /admin/marketplace
+     * routes), everything else is the public slug (used by /vendor routes).
+     */
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if ($field) {
+            return $this->where($field, $value)->first();
+        }
+
+        return is_numeric($value)
+            ? $this->where($this->getKeyName(), $value)->first()
+            : $this->where('slug', $value)->first();
+    }
 }

@@ -23,4 +23,30 @@ enum VendorStatus: string
             self::INACTIVE => 'Inactive',
         };
     }
+
+    /**
+     * Centralized transition graph — the only place that decides which status
+     * changes are valid. Nothing else in the codebase should hard-code this.
+     *
+     *   pending   -> active (approve), rejected (reject)
+     *   active    -> suspended, inactive
+     *   suspended -> active (reactivate)
+     *   inactive  -> active (reactivate)
+     *   rejected  -> (terminal; no further transitions in this phase)
+     */
+    public static function allowedTransitions(): array
+    {
+        return [
+            self::PENDING->value => [self::ACTIVE, self::REJECTED],
+            self::ACTIVE->value => [self::SUSPENDED, self::INACTIVE],
+            self::SUSPENDED->value => [self::ACTIVE],
+            self::INACTIVE->value => [self::ACTIVE],
+            self::REJECTED->value => [],
+        ];
+    }
+
+    public function canTransitionTo(self $to): bool
+    {
+        return in_array($to, self::allowedTransitions()[$this->value] ?? [], true);
+    }
 }

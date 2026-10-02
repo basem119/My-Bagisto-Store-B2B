@@ -4,20 +4,24 @@ namespace Webkul\Marketplace\Policies;
 
 use Webkul\Customer\Models\Customer;
 use Webkul\Marketplace\Enums\VendorUserRole;
+use Webkul\Marketplace\Enums\VendorUserStatus;
 use Webkul\Marketplace\Models\Vendor;
+use Webkul\Marketplace\Models\VendorUser;
 
 /**
  * Every check is parameterized by a specific Vendor instance — membership in
- * Vendor A never grants any permission on Vendor B.
+ * Vendor A never grants any permission on Vendor B. All checks additionally
+ * require the membership itself to be `active` — a suspended/invited member
+ * cannot perform any vendor operation (see docs/architecture/marketplace-domain.md).
  */
 class VendorPolicy
 {
     /**
-     * May view the vendor's own dashboard/profile (any membership role).
+     * May view the vendor's own dashboard/profile (any active membership role).
      */
     public function view(Customer $customer, Vendor $vendor): bool
     {
-        return $this->roleFor($customer, $vendor) !== null;
+        return $this->activeMembershipFor($customer, $vendor) !== null;
     }
 
     /**
@@ -25,7 +29,9 @@ class VendorPolicy
      */
     public function update(Customer $customer, Vendor $vendor): bool
     {
-        return in_array($this->roleFor($customer, $vendor), VendorUserRole::managerialRoles(), true);
+        $membership = $this->activeMembershipFor($customer, $vendor);
+
+        return $membership !== null && in_array($membership->role, VendorUserRole::managerialRoles(), true);
     }
 
     /**
@@ -41,13 +47,17 @@ class VendorPolicy
      */
     public function manageProducts(Customer $customer, Vendor $vendor): bool
     {
-        return $this->roleFor($customer, $vendor) !== null;
+        return $this->activeMembershipFor($customer, $vendor) !== null;
     }
 
-    protected function roleFor(Customer $customer, Vendor $vendor): ?VendorUserRole
+    protected function activeMembershipFor(Customer $customer, Vendor $vendor): ?VendorUser
     {
         $vendorUser = $vendor->users()->where('customer_id', $customer->id)->first();
 
-        return $vendorUser?->role;
+        if (! $vendorUser || $vendorUser->status !== VendorUserStatus::ACTIVE) {
+            return null;
+        }
+
+        return $vendorUser;
     }
 }
