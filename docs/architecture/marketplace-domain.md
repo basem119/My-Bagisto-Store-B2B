@@ -1,7 +1,11 @@
-# Marketplace Domain Architecture (Phase 5)
+# Marketplace Domain Architecture (Phase 5 + Phase 6)
 
-Status: Foundational domain implemented. Checkout/fulfillment/commission/storefront are
-documented here as boundaries only — not yet implemented (see "Deferred" at the end).
+Status: Core domain (Phase 5) plus vendor lifecycle, onboarding, membership enforcement, and
+the Vendor Portal/Admin HTTP foundation (Phase 6) are implemented. Checkout/fulfillment/
+commission/storefront/catalog UI remain documented here as boundaries only — not yet
+implemented (see "Deferred" at the end). Sections below are annotated `(Phase 6)` where a
+Phase 6 decision extended or superseded the original Phase 5 text; unannotated text is
+unchanged Phase 5 architecture.
 
 ## 1. Company vs Vendor boundary
 
@@ -42,6 +46,44 @@ Status is an explicit PHP enum (`Webkul\Marketplace\Enums\VendorStatus`), not a 
 `pending`, `active`, `suspended`, `rejected`, `inactive`. Centralized in one place; every
 status comparison in the codebase goes through this enum, never a raw string literal.
 
+### 2a. Vendor lifecycle transitions (Phase 6)
+
+The enum also owns the **transition graph** — the single place that decides which status
+changes are valid (`VendorStatus::allowedTransitions()` / `canTransitionTo()`):
+
+```
+pending   -> active (approve), rejected (reject)
+active    -> suspended, inactive
+suspended -> active (reactivate)
+inactive  -> active (reactivate)
+rejected  -> (terminal; no further transitions)
+```
+
+`VendorService` (renamed Phase 5's `register()` to `apply()`, to match the onboarding
+language used everywhere else — `VendorApplicationRequest`, the `/vendor/apply` route) is
+the **only** place `vendors.status` is allowed to change. Every transition goes through a
+shared `transition()` helper that calls `guardTransition()` (which defers entirely to
+`VendorStatus::canTransitionTo()` — no hard-coded `$allowedFrom` arrays scattered around),
+wraps the mutation + `VendorStatusHistory` row in `DB::transaction()`, then dispatches the
+corresponding event and sends a best-effort owner notification **outside** the transaction
+(a notification failure must never roll back a lifecycle transition).
+
+**Decision — no separate `APPROVED` enum case:** the task's lifecycle diagram shows
+`pending → approved → active` as two steps, but this implementation treats "approve" as a
+direct `pending → active` transition, captured via the existing `approved_at` timestamp
+rather than an intermediate status. Adding a new enum case would be redesigning Phase 5
+architecture without a concrete defect, which Phase 6 was explicitly told not to do; the
+two-step *language* in the spec is fully satisfied by `approved_at` plus the status history
+row recording the `pending → active` event.
+
+**Decision — ownership transfer is explicitly deferred**, not partially implemented. A
+vendor's single `owner` `VendorUser` row is set once, at application time
+(`VendorService::apply()`), and nothing in Phase 6 allows reassigning it:
+`VendorMembershipService::addMember()`/`assignRole()` both unconditionally reject the
+`owner` role. This was chosen over a partial transfer mechanism per the task's explicit
+instruction: "If ownership transfer is not necessary yet, explicitly defer it rather than
+implementing a partial solution."
+
 ### Why not reuse `product_inventories.vendor_id`?
 
 Investigated (carried over from Phase 1 findings): `product_inventories.vendor_id` is an
@@ -80,6 +122,13 @@ existing `customer` guard (same login, password reset, session system Bagisto al
 No new auth guard, no new credentials table. This keeps Phase 5 focused on the domain model,
 not a parallel authentication system.
 
+**(Phase 6)** Member `status` is now an operational gate, not just a data point: both
+`VendorPolicy` and the Vendor Portal's `EnsureVendorContext` middleware require
+`VendorUserStatus::ACTIVE`, resolved via `VendorMembershipService::isActiveMember()`. A
+`suspended`/`invited` membership row still exists (so re-activation doesn't need to recreate
+it) but grants zero access — verified by both a service-level assertion and a real HTTP
+request returning 403 for a suspended member.
+
 ## 4. Vendor role / permission model
 
 Four roles, stored directly on the membership row (not a separate roles table, unlike B2B
@@ -105,6 +154,13 @@ a membership row's existence (and role) for `(customer_id, vendor_id)` is the *o
 of truth. There is no global "is this customer a vendor admin" check — every authorization
 decision is parameterized by a specific `Vendor` instance, so a Vendor A admin is
 structurally incapable of resolving `true` for Vendor B (no matching row exists).
+
+**(Phase 6)** `VendorPolicy` was extended so every check (`view`, `update`, `manageMembers`,
+`manageProducts`) routes through a single `activeMembershipFor(Customer, Vendor): ?VendorUser`
+helper — Phase 5 only checked row existence; Phase 6 also requires `status === ACTIVE`.
+Verified: owner/admin can `update()`, manager/staff can `view()` but not `update()`, and a
+suspended member can do neither, all confirmed with real cross-vendor HTTP requests (not
+just unit assertions).
 
 ## 5. Vendor product ownership — Product vs Vendor Offer
 
@@ -206,17 +262,39 @@ view exists yet — the backend data model is simply ready for one.
 
 ## 11. Admin vs Vendor portal boundary
 
-No HTTP routes/controllers are added in Phase 5 (explicitly deferred). The domain is built
-so that when those are added:
+**(Phase 6)** Phase 5 deferred all HTTP; Phase 6 built both sides on top of the unchanged
+Phase 5 services, exactly as this section predicted:
 
-- **Platform Admin** actions (approve/suspend/reject a vendor) go through
-  `VendorService::approve()/suspend()/reject()` — callable from an admin-guarded controller.
-- **Vendor Portal** actions (manage own staff/offers) go through `VendorPolicy` +
-  `VendorMembershipService`/`VendorProductService` — callable from a customer-guarded
-  controller, always scoped to the acting customer's own vendor membership.
+- **Platform Admin** — `admin/marketplace/vendors` (list/view/approve/reject/suspend/
+  reactivate), guarded by the existing `admin` + `Bouncer` middleware and 7 new
+  `marketplace.*` ACL nodes (`Config/admin/acl.php`). `Http\Controllers\Admin\VendorController`
+  calls `VendorService`/`VendorMembershipService` only — it never writes `vendors.status`
+  directly. The vendor-view action also surfaces `statusHistories` and `members` (Step 16's
+  "inspect vendor members / status history" requirement) without a separate dashboard.
+- **Vendor Portal** — `vendor/apply` (public, onboarding) and a `{vendor:slug}` group
+  (`dashboard`, `profile`, `team`) guarded by the existing `customer` guard plus a new
+  `Http\Middleware\EnsureVendorContext` middleware. The middleware never trusts a vendor id
+  from the URL: it relies on Laravel route-model-binding to resolve `{vendor:slug}` into an
+  actual `Vendor` instance, then calls `VendorMembershipService::isActiveMember()` before
+  letting the request reach any controller. Unauthenticated requests redirect to
+  `customer.login`; authenticated-but-not-a-member (or suspended) requests get a 403.
 
-The same services are reusable from both contexts; the boundary is enforced by *who is
-allowed to call which service method*, not by duplicating logic per portal.
+The same Phase 5 services are reused from both contexts unmodified in their core
+invariants; the boundary is enforced by *who is allowed to call which service method and
+through which middleware stack*, not by duplicating logic per portal.
+
+### Route-model-binding gotcha (Phase 6)
+
+Konekt Concord auto-registers an **explicit** route binder for every Concord model, keyed by
+its short parameter name (here `"vendor"`). Laravel's `Router::substituteBindings()` checks
+explicit binders *before* falling back to implicit per-controller-type-hint binding, and
+Concord's explicit binder always calls `resolveRouteBinding($value)` with no `$field` —
+which silently ignores the `{vendor:slug}` binding-field syntax and falls back to primary-key
+lookup. Fixed by overriding `Vendor::resolveRouteBinding($value, $field = null)` to
+disambiguate by value shape when `$field` is absent: numeric → primary key (admin routes use
+plain `{vendor}`), non-numeric → `slug` (portal routes use `{vendor:slug}`). This is the
+general fix for *any* Concord-registered model that needs slug-based routing alongside
+id-based admin routing.
 
 ## 12. GraphQL boundary
 
@@ -238,11 +316,25 @@ packages/Webkul/Marketplace/
         Repositories/      VendorRepository, VendorUserRepository, VendorProductRepository
         Services/          VendorService, VendorMembershipService, VendorProductService
         Events/            VendorCreated, VendorApproved, VendorSuspended, VendorRejected,
-                           VendorMemberAdded, VendorMemberRemoved,
+                           VendorReactivated (Phase 6), VendorMemberAdded, VendorMemberRemoved,
+                           VendorRoleChanged (Phase 6),
                            VendorProductAttached, VendorProductDetached
+        Notifications/     VendorApplicationReceived, VendorStatusChanged (Phase 6 — plain
+                           Illuminate\Notifications\Notification, Notifiable Customer/Admin)
         Policies/          VendorPolicy
+        Http/              (Phase 6)
+            Controllers/Admin/    VendorController
+            Controllers/Vendor/   Controller (base), OnboardingController, DashboardController,
+                                  ProfileController, TeamController
+            Middleware/           EnsureVendorContext
+            Requests/             VendorApplicationRequest, VendorProfileUpdateRequest,
+                                  AddVendorMemberRequest, UpdateVendorMemberRoleRequest,
+                                  VendorStatusActionRequest
+        Routes/            (Phase 6) web.php, admin-routes.php, vendor-routes.php
+        Resources/         (Phase 6) views/{admin,vendor}/..., lang/en/app.php
+        Config/            (Phase 6) admin/acl.php — 7 marketplace.* ACL nodes
         Providers/         ModuleServiceProvider (Concord), MarketplaceServiceProvider
-                           (policy/event registration)
+                           (policy/routes/views/translations/ACL/middleware-alias registration)
         Database/Migrations/
 ```
 
@@ -264,10 +356,28 @@ package in this repository (including the custom `Paymob` package), registered t
 - **Reusing `product_inventories.vendor_id`** — rejected; see Section 2.
 - **Full custom-permission JSON per vendor role (mirroring `CompanyRole`)** — deferred; a
   fixed 4-role enum is sufficient for this phase and is additively upgradable later.
+- **(Phase 6) A new `VendorStatus::APPROVED` enum case** — rejected; see Section 2a.
+  `approve()` is a direct `pending → active` transition, recorded via `approved_at` +
+  status history, not a new intermediate status.
+- **(Phase 6) Ownership transfer** — rejected for this phase (deferred, not partially
+  built); see Section 2a. Implementing "reassign owner" as a half-measure (e.g., allowing
+  role assignment to `owner` without a transactional old-owner-demotion/new-owner-promotion
+  pair) would risk a vendor ending up with zero or two owners.
+- **(Phase 6) Manual vendor lookup + `setParameter()` in `EnsureVendorContext`** — rejected
+  in favor of Laravel's native `{vendor:slug}` route-model-binding (see Section 11); the
+  middleware now trusts the already-resolved `Vendor` instance instead of re-querying by a
+  raw slug string pulled off the route.
 
-## Deferred (explicitly NOT built in Phase 5)
+## Deferred (explicitly NOT built in Phase 5 or Phase 6)
 
-Vendor portal (HTTP/UI), vendor storefront (frontend), catalog management UI, vendor pricing
-UI, multi-vendor cart, parent/vendor orders, fulfillment, RFQ marketplace integration,
-independent PO (if ever required), commissions, settlements, notifications, GraphQL
-marketplace API, final security/regression/performance/payment testing.
+Vendor storefront (public-facing frontend), vendor product/catalog management UI, vendor
+pricing UI, vendor inventory management UI, multi-vendor cart, marketplace checkout,
+parent/vendor orders, fulfillment, RFQ marketplace integration, independent PO, commissions,
+settlements, lifecycle notifications beyond the current set (application-received,
+status-changed), GraphQL marketplace API, ownership transfer, final
+security/regression/performance/payment E2E testing.
+
+Phase 6 additionally resolved (no longer deferred, see Section 11): vendor onboarding HTTP
+flow, admin vendor lifecycle management HTTP, Vendor Portal foundation (dashboard/profile/
+team), vendor-scoped HTTP authorization middleware, active-membership enforcement in
+`VendorPolicy`, lifecycle notifications for application/status-change events.
