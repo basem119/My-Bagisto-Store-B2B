@@ -1,0 +1,17 @@
+{
+    "name": "bagisto/marketplace",
+    "license": "MIT",
+    "description": "Marketplace Vendor domain foundation (Phase 5).",
+    "authors": [
+        {
+            "name": "Basem Maher",
+            "email": "basem@gmail.com"
+        }
+    ],
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Webkul\\Marketplace\\": "src/"
+        }
+    }
+}
