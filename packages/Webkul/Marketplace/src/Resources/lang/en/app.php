@@ -10,6 +10,7 @@ return [
             'reject' => 'Reject',
             'suspend' => 'Suspend',
             'reactivate' => 'Reactivate',
+            'vendor-products' => 'Vendor Products',
         ],
         'vendors' => [
             'index' => [
@@ -21,6 +22,11 @@ return [
                 'reject-btn' => 'Reject',
                 'suspend-btn' => 'Suspend',
                 'reactivate-btn' => 'Reactivate',
+            ],
+        ],
+        'vendor-products' => [
+            'index' => [
+                'title' => 'Vendor Products',
             ],
         ],
     ],
@@ -39,6 +45,13 @@ return [
         'team' => [
             'title' => 'Team',
             'add-btn' => 'Add Member',
+            'remove-btn' => 'Remove',
+        ],
+        'products' => [
+            'title' => 'Products',
+            'add-btn' => 'Add Product',
+            'edit-btn' => 'Edit',
+            'save-btn' => 'Save Offer',
             'remove-btn' => 'Remove',
         ],
     ],

@@ -36,5 +36,10 @@ return [
         'name' => 'marketplace::app.admin.acl.reactivate',
         'route' => 'marketplace.admin.vendors.reactivate',
         'sort' => 5,
+    ], [
+        'key' => 'marketplace.vendor_products',
+        'name' => 'marketplace::app.admin.acl.vendor-products',
+        'route' => 'marketplace.admin.vendor-products.index',
+        'sort' => 6,
     ],
 ];

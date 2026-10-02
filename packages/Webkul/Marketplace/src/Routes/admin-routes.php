@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Webkul\Core\Http\Middleware\NoCacheMiddleware;
 use Webkul\Marketplace\Http\Controllers\Admin\VendorController;
+use Webkul\Marketplace\Http\Controllers\Admin\VendorProductController;
 
 /**
  * Platform-admin vendor lifecycle management — protected by Bagisto's
@@ -23,4 +24,6 @@ Route::group(['middleware' => ['admin', NoCacheMiddleware::class], 'prefix' => c
 
         Route::post('{vendor}/reactivate', 'reactivate')->name('marketplace.admin.vendors.reactivate');
     });
+
+    Route::get('vendor-products', [VendorProductController::class, 'index'])->name('marketplace.admin.vendor-products.index');
 });
