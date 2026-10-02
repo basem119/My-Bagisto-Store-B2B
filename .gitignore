@@ -33,6 +33,9 @@ yarn-error.log
 /test-results
 /playwright-report
 
+# Database backups (local safety snapshots, never commit real data)
+/db-backups
+
 # Misc
 .php_cs.cache
 .phpunit.result.cache

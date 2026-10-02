@@ -46,7 +46,6 @@
         <div class="mt-7 flex items-center justify-between gap-4 max-md:flex-wrap">
             <div class="flex items-center gap-x-1">
                 <!-- Locale Switcher -->
-
                 <x-admin::dropdown 
                     position="bottom-{{ core()->getCurrentLocale()->direction === 'ltr' ? 'left' : 'right' }}" 
                     :class="core()->getAllLocales()->count() <= 1 ? 'hidden' : ''"
@@ -59,7 +58,7 @@
                         >
                             <span class="icon-language text-2xl"></span>
 
-                            {{ $currentLocale->name }}
+                            <span v-pre>{{ $currentLocale->name }}</span>
 
                             <input
                                 type="hidden"
@@ -77,6 +76,7 @@
                             <a
                                 href="?{{ Arr::query(['locale' => $locale->code]) }}"
                                 class="flex gap-2.5 px-5 py-2 text-base cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-950 dark:text-white {{ $locale->code == $currentLocale->code ? 'bg-gray-100 dark:bg-gray-950' : ''}}"
+                                v-pre
                             >
                                 {{ $locale->name }}
                             </a>
@@ -177,7 +177,6 @@
                                 :value="old($currentLocale->code)['description'] ?? ($category->translate($currentLocale->code)['description'] ?? '')"
                                 :label="trans('admin::app.catalog.categories.edit.description')"
                                 :tinymce="true"
-                                :prompt="core()->getConfigData('general.magic_ai.content_generation.category_description_prompt')"
                             />
 
                             <x-admin::form.control-group.error control-name="{{ $currentLocale->code }}[description]" />
@@ -197,7 +196,14 @@
 
                             <x-admin::media.images
                                 name="logo_path"
-                                :uploaded-images="$category->logo_path ? [['id' => 'logo_path', 'url' => $category->logo_url]] : []"
+                                meta-name="logo_meta"
+                                enable-seo="true"
+                                :uploaded-images="$category->logo_path ? [[
+                                    'id'        => 'logo_path',
+                                    'url'       => $category->logo_url,
+                                    'file_name' => $category->logo_file_name,
+                                    'alt_text'  => $category->logo_alt,
+                                ]] : []"
                             />
                         </div>
 
@@ -213,7 +219,14 @@
 
                             <x-admin::media.images
                                 name="banner_path"
-                                :uploaded-images="$category->banner_path ? [['id' => 'banner_path', 'url' => $category->banner_url]] : []"
+                                meta-name="banner_meta"
+                                enable-seo="true"
+                                :uploaded-images="$category->banner_path ? [[
+                                    'id'        => 'banner_path',
+                                    'url'       => $category->banner_url,
+                                    'file_name' => $category->banner_file_name,
+                                    'alt_text'  => $category->banner_alt,
+                                ]] : []"
                                 width="220px"
                             />
                         </div>
@@ -231,7 +244,11 @@
                     </p>
 
                     <!-- SEO Title & Description Blade Component -->
-                    <x-admin::seo/>
+                    <x-admin::seo
+                        meta-title-field="{{ $currentLocale->code }}[meta_title]"
+                        url-key-field="{{ $currentLocale->code }}[slug]"
+                        meta-description-field="{{ $currentLocale->code }}[meta_description]"
+                    />
 
                     <div class="mt-8">
                         <!-- Meta Title -->
@@ -442,6 +459,7 @@
                                 <label
                                     class="cursor-pointer text-xs font-medium text-gray-600 dark:text-gray-300"
                                     for="{{ $attribute->name ?? $attribute->admin_name }}"
+                                    v-pre
                                 >
                                     {{ $attribute->name ?? $attribute->admin_name }}
                                 </label>

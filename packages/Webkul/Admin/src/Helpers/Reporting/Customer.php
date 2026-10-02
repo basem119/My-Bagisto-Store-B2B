@@ -2,6 +2,7 @@
 
 namespace Webkul\Admin\Helpers\Reporting;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Webkul\Customer\Repositories\CustomerRepository;
@@ -30,7 +31,7 @@ class Customer extends AbstractReporting
     {
         return [
             'previous' => $previous = $this->getTotalCustomers($this->lastStartDate, $this->lastEndDate),
-            'current'  => $current = $this->getTotalCustomers($this->startDate, $this->endDate),
+            'current' => $current = $this->getTotalCustomers($this->startDate, $this->endDate),
             'progress' => $this->getPercentageChange($previous, $current),
         ];
     }
@@ -64,7 +65,7 @@ class Customer extends AbstractReporting
     {
         return [
             'previous' => $previous = $this->getTotalCustomers(now()->subDay()->startOfDay(), now()->subDay()->endOfDay()),
-            'current'  => $current = $this->getTotalCustomers(now()->today(), now()->endOfDay()),
+            'current' => $current = $this->getTotalCustomers(now()->today(), now()->endOfDay()),
             'progress' => $this->getPercentageChange($previous, $current),
         ];
     }
@@ -72,8 +73,8 @@ class Customer extends AbstractReporting
     /**
      * Retrieves total customers by date
      *
-     * @param  \Carbon\Carbon  $startDate
-     * @param  \Carbon\Carbon  $endDate
+     * @param  Carbon  $startDate
+     * @param  Carbon  $endDate
      */
     public function getTotalCustomers($startDate, $endDate): int
     {
@@ -91,7 +92,7 @@ class Customer extends AbstractReporting
     {
         return [
             'previous' => $previous = $this->getTotalReviews($this->lastStartDate, $this->lastEndDate),
-            'current'  => $current = $this->getTotalReviews($this->startDate, $this->endDate),
+            'current' => $current = $this->getTotalReviews($this->startDate, $this->endDate),
             'progress' => $this->getPercentageChange($previous, $current),
         ];
     }
@@ -99,8 +100,8 @@ class Customer extends AbstractReporting
     /**
      * Retrieves total reviews by date
      *
-     * @param  \Carbon\Carbon  $startDate
-     * @param  \Carbon\Carbon  $endDate
+     * @param  Carbon  $startDate
+     * @param  Carbon  $endDate
      */
     public function getTotalReviews($startDate, $endDate): int
     {
@@ -133,7 +134,7 @@ class Customer extends AbstractReporting
             )
             ->whereIn('channel_id', $this->channelIds)
             ->whereBetween('created_at', [$this->startDate, $this->endDate])
-            ->groupBy(DB::raw('CONCAT(customer_email, "-", customer_id)'))
+            ->groupBy(['customer_email', 'customer_id'])
             ->orderByDesc('total')
             ->limit($limit)
             ->get();
@@ -158,7 +159,7 @@ class Customer extends AbstractReporting
             )
             ->whereIn('channel_id', $this->channelIds)
             ->whereBetween('created_at', [$this->startDate, $this->endDate])
-            ->groupBy(DB::raw('CONCAT(customer_email, "-", customer_id)'))
+            ->groupBy(['customer_email', 'customer_id'])
             ->orderByDesc('orders')
             ->limit($limit)
             ->get();
@@ -217,8 +218,8 @@ class Customer extends AbstractReporting
     /**
      * Returns over time stats.
      *
-     * @param  \Carbon\Carbon  $startDate
-     * @param  \Carbon\Carbon  $endDate
+     * @param  Carbon  $startDate
+     * @param  Carbon  $endDate
      * @param  string  $period
      */
     public function getTotalCustomersOverTime($startDate, $endDate, $period = 'auto'): array

@@ -5,6 +5,7 @@ namespace Webkul\Product\Type;
 use Webkul\Attribute\Repositories\AttributeRepository;
 use Webkul\Checkout\Models\CartItem;
 use Webkul\Customer\Repositories\CustomerRepository;
+use Webkul\Product\Contracts\Product;
 use Webkul\Product\DataTypes\CartItemValidationResult;
 use Webkul\Product\Helpers\Indexers\Price\Downloadable as DownloadableIndexer;
 use Webkul\Product\Repositories\ProductAttributeValueRepository;
@@ -32,6 +33,8 @@ class Downloadable extends AbstractType
         'depth',
         'manage_stock',
         'guest_checkout',
+        'allow_rma',
+        'rma_rule_id',
     ];
 
     /**
@@ -59,7 +62,7 @@ class Downloadable extends AbstractType
         ProductRepository $productRepository,
         ProductAttributeValueRepository $attributeValueRepository,
         ProductInventoryRepository $productInventoryRepository,
-        productImageRepository $productImageRepository,
+        ProductImageRepository $productImageRepository,
         ProductVideoRepository $productVideoRepository,
         ProductCustomerGroupPriceRepository $productCustomerGroupPriceRepository,
         protected ProductDownloadableLinkRepository $productDownloadableLinkRepository,
@@ -82,7 +85,7 @@ class Downloadable extends AbstractType
      *
      * @param  int  $id
      * @param  array  $attributes
-     * @return \Webkul\Product\Contracts\Product
+     * @return Product
      */
     public function update(array $data, $id, $attributes = [])
     {
@@ -125,11 +128,11 @@ class Downloadable extends AbstractType
     public function getTypeValidationRules()
     {
         return [
-            'downloadable_links.*.type'       => 'required',
-            'downloadable_links.*.file'       => 'required_if:type,==,file',
-            'downloadable_links.*.file_name'  => 'required_if:type,==,file',
-            'downloadable_links.*.url'        => 'required_if:type,==,url',
-            'downloadable_links.*.downloads'  => 'required',
+            'downloadable_links.*.type' => 'required',
+            'downloadable_links.*.file' => 'required_if:type,==,file',
+            'downloadable_links.*.file_name' => 'required_if:type,==,file',
+            'downloadable_links.*.url' => 'required_if:type,==,url',
+            'downloadable_links.*.downloads' => 'required',
             'downloadable_links.*.sort_order' => 'required',
         ];
     }
@@ -212,8 +215,8 @@ class Downloadable extends AbstractType
 
         $data['attributes'][0] = [
             'attribute_name' => 'Downloads',
-            'option_id'      => 0,
-            'option_label'   => implode(', ', $labels),
+            'option_id' => 0,
+            'option_label' => implode(', ', $labels),
         ];
 
         return $data;
@@ -289,5 +292,30 @@ class Downloadable extends AbstractType
     public function getPriceIndexer()
     {
         return app(DownloadableIndexer::class);
+    }
+
+    /**
+     * Copy relationships.
+     *
+     * @param  \Webkul\Product\Models\Product  $product
+     * @return void
+     */
+    protected function copyRelationships($product)
+    {
+        parent::copyRelationships($product);
+
+        $attributesToSkip = config('products.copy.skip_attributes') ?? [];
+
+        if (! in_array('downloadable_links', $attributesToSkip)) {
+            foreach ($this->product->downloadable_links as $downloadableLink) {
+                $product->downloadable_links()->save($downloadableLink->replicateWithTranslations());
+            }
+        }
+
+        if (! in_array('downloadable_samples', $attributesToSkip)) {
+            foreach ($this->product->downloadable_samples as $downloadableSample) {
+                $product->downloadable_samples()->save($downloadableSample->replicateWithTranslations());
+            }
+        }
     }
 }

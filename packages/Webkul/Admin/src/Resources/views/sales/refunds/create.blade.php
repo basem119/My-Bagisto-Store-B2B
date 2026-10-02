@@ -53,10 +53,21 @@
                                             @lang('admin::app.sales.refunds.create.update-totals-btn')
                                         </div>
 
+										@foreach ($order->items as $item)
+                                            @php
+                                                $canRefundAfterRMA = app('\Webkul\RMA\Helpers\Helper')->canRefundAfterRMA($item->id);
+                                            @endphp
+
+                                            @if (! $canRefundAfterRMA)
+                                                @break
+                                            @endif
+                                        @endforeach
+
                                         <!-- Refund Submit Button -->
                                         <button
                                             type="submit"
                                             class="primary-button ltr:mr-11 rtl:ml-11"
+                                            @if ($canRefundAfterRMA) disabled @endif
                                         >
                                             @lang('admin::app.sales.refunds.create.refund-btn')
                                         </button>
@@ -92,7 +103,10 @@
 
                                                 <div class="grid place-content-start gap-1.5">
                                                     <!-- Item Additional Attributes -->
-                                                    <p class="break-all text-base font-semibold text-gray-800 dark:text-white">
+                                                    <p 
+                                                        class="break-all text-base font-semibold text-gray-800 dark:text-white"
+                                                        v-pre
+                                                    >
                                                         {{ $item->name }}
                                                     </p>
 
@@ -107,7 +121,10 @@
                                                         <!-- Item Additional Attributes -->
                                                         @if (isset($item->additional['attributes']))
                                                             @foreach ($item->additional['attributes'] as $attribute)
-                                                                <p class="text-gray-600 dark:text-gray-300">
+                                                                <p
+                                                                    class="text-gray-600 dark:text-gray-300"
+                                                                    v-pre
+                                                                >
                                                                     @if (
                                                                         ! isset($attribute['attribute_type'])
                                                                         || $attribute['attribute_type'] !== 'file'
@@ -130,7 +147,7 @@
 
                                                         <!-- Item SKU -->
                                                         <p class="text-gray-600 dark:text-gray-300">
-                                                            @lang('admin::app.sales.refunds.create.sku', ['sku' => Webkul\Product\Helpers\ProductType::hasVariants($item->type) ? $item->child->sku : $item->sku])
+                                                            @lang('admin::app.sales.refunds.create.sku', ['sku' => $item->getTypeInstance()->getOrderedItem($item)->sku])
                                                         </p>
 
                                                         <!-- Item Status -->

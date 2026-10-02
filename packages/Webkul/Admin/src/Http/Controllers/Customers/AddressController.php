@@ -3,7 +3,9 @@
 namespace Webkul\Admin\Http\Controllers\Customers;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Event;
+use Illuminate\View\View;
 use Webkul\Admin\Http\Controllers\Controller;
 use Webkul\Admin\Http\Requests\AddressRequest;
 use Webkul\Admin\Http\Resources\AddressResource;
@@ -25,7 +27,7 @@ class AddressController extends Controller
     /**
      * Fetch address by customer id.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function index(int $id)
     {
@@ -37,7 +39,7 @@ class AddressController extends Controller
     /**
      * Show the form for creating a new resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function create(int $id)
     {
@@ -85,14 +87,14 @@ class AddressController extends Controller
 
         return new JsonResponse([
             'message' => trans('admin::app.customers.customers.view.address.create-success'),
-            'data'    => new AddressResource($address),
+            'data' => new AddressResource($address),
         ]);
     }
 
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function edit(int $id)
     {
@@ -138,7 +140,7 @@ class AddressController extends Controller
 
         return new JsonResponse([
             'message' => trans('admin::app.customers.customers.view.address.update-success'),
-            'data'    => new AddressResource($address),
+            'data' => new AddressResource($address),
         ]);
     }
 
@@ -146,7 +148,7 @@ class AddressController extends Controller
      * To change the default address or make the default address,
      * by default when first address is created will be the default address.
      *
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function makeDefault($id)
     {
@@ -155,22 +157,22 @@ class AddressController extends Controller
         }
 
         $address = $this->customerAddressRepository->findOneWhere([
-            'id'              => request('set_as_default'),
-            'customer_id'     => $id,
+            'id' => request('set_as_default'),
+            'customer_id' => $id,
         ]);
 
         $address->update(['default_address' => 1]);
 
         return new JsonResponse([
             'message' => trans('admin::app.customers.customers.view.address.set-default-success'),
-            'data'    => $address,
+            'data' => $address,
         ]);
     }
 
     /**
      * Remove the specified resource from storage.
      *
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function destroy(int $id)
     {

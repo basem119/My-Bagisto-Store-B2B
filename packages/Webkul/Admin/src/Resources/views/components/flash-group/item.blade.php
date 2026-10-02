@@ -92,12 +92,12 @@
                 };
             },
 
-            created() {
+            mounted() {
                 var self = this;
 
                 setTimeout(function() {
                     self.remove()
-                }, 5000)
+                }, 2000)
             },
 
             methods: {

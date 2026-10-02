@@ -10,7 +10,6 @@ use Webkul\Admin\Http\Controllers\Settings\LocaleController;
 use Webkul\Admin\Http\Controllers\Settings\RoleController;
 use Webkul\Admin\Http\Controllers\Settings\Tax\TaxCategoryController;
 use Webkul\Admin\Http\Controllers\Settings\Tax\TaxRateController;
-use Webkul\Admin\Http\Controllers\Settings\ThemeController;
 use Webkul\Admin\Http\Controllers\Settings\UserController;
 
 /**
@@ -168,22 +167,6 @@ Route::prefix('settings')->group(function () {
         Route::put('confirm', 'destroySelf')->name('admin.settings.users.destroy');
     });
 
-    Route::controller(ThemeController::class)->prefix('themes')->group(function () {
-        Route::get('', 'index')->name('admin.settings.themes.index');
-
-        Route::get('edit/{id}', 'edit')->name('admin.settings.themes.edit');
-
-        Route::post('store', 'store')->name('admin.settings.themes.store');
-
-        Route::post('edit/{id}', 'update')->name('admin.settings.themes.update');
-
-        Route::delete('edit/{id}', 'destroy')->name('admin.settings.themes.delete');
-
-        Route::post('mass-update', 'massUpdate')->name('admin.settings.themes.mass_update');
-
-        Route::post('mass-delete', 'massDestroy')->name('admin.settings.themes.mass_delete');
-    });
-
     /**
      * Data Transfer routes.
      */
@@ -208,6 +191,18 @@ Route::prefix('settings')->group(function () {
 
             Route::get('validate/{id}', 'validateImport')->name('admin.settings.data_transfer.imports.validate');
 
+            Route::get('validate-chunk/{id}', 'validateChunk')->name('admin.settings.data_transfer.imports.validate_chunk');
+
+            Route::get('validate-queued/{id}', 'validateQueued')->name('admin.settings.data_transfer.imports.validate_queued');
+
+            Route::get('validate-status/{id}', 'validateStatus')->name('admin.settings.data_transfer.imports.validate_status');
+
+            Route::get('download-images/{id}', 'downloadImages')->name('admin.settings.data_transfer.imports.download_images');
+
+            Route::get('download-images-queued/{id}', 'downloadImagesQueued')->name('admin.settings.data_transfer.imports.download_images_queued');
+
+            Route::get('download-images-status/{id}', 'downloadImagesStatus')->name('admin.settings.data_transfer.imports.download_images_status');
+
             Route::get('start/{id}', 'start')->name('admin.settings.data_transfer.imports.start');
 
             Route::get('link/{id}', 'link')->name('admin.settings.data_transfer.imports.link');
@@ -217,6 +212,8 @@ Route::prefix('settings')->group(function () {
             Route::get('stats/{id}/{state?}', 'stats')->name('admin.settings.data_transfer.imports.stats');
 
             Route::get('download-sample/{type}/{format}', 'downloadSample')->name('admin.settings.data_transfer.imports.download_sample');
+
+            Route::get('download-sample-images-zip/{type?}', 'downloadSampleImagesZip')->name('admin.settings.data_transfer.imports.download_sample_zip');
 
             Route::get('download/{id}', 'download')->name('admin.settings.data_transfer.imports.download');
 

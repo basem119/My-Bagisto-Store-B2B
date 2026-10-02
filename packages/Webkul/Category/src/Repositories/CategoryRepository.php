@@ -2,16 +2,30 @@
 
 namespace Webkul\Category\Repositories;
 
+use Illuminate\Container\Container;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Intervention\Image\ImageManager;
 use Webkul\Category\Contracts\Category;
 use Webkul\Category\Models\CategoryTranslationProxy;
 use Webkul\Core\Eloquent\Repository;
+use Webkul\Core\Helpers\MediaFileName;
 
 class CategoryRepository extends Repository
 {
+    /**
+     * Create a new repository instance.
+     *
+     * @return void
+     */
+    public function __construct(
+        protected MediaFileName $mediaFileName,
+        Container $container
+    ) {
+        parent::__construct($container);
+    }
+
     /**
      * Specify model class name.
      */
@@ -67,7 +81,7 @@ class CategoryRepository extends Repository
     /**
      * Create category.
      *
-     * @return \Webkul\Category\Contracts\Category
+     * @return Category
      */
     public function create(array $data)
     {
@@ -105,8 +119,7 @@ class CategoryRepository extends Repository
      * Update category.
      *
      * @param  int  $id
-     * @param  string  $attribute
-     * @return \Webkul\Category\Contracts\Category
+     * @return Category
      */
     public function update(array $data, $id)
     {
@@ -128,9 +141,53 @@ class CategoryRepository extends Repository
     }
 
     /**
+     * Retrieve category from slug.
+     *
+     * @param  string  $slug
+     * @return Category
+     */
+    public function findBySlug($slug)
+    {
+        if ($category = $this->model->whereTranslation('slug', $slug)->first()) {
+            return $category;
+        }
+    }
+
+    /**
+     * Retrieve category from slug.
+     *
+     * @param  string  $slug
+     * @return Category
+     */
+    public function findBySlugOrFail($slug)
+    {
+        return $this->model->whereTranslation('slug', $slug)->firstOrFail();
+    }
+
+    /**
+     * Get root categories.
+     *
+     * @return Collection
+     */
+    public function getRootCategories()
+    {
+        return $this->getModel()->where('parent_id', null)->get();
+    }
+
+    /**
+     * Get child categories.
+     *
+     * @return Collection
+     */
+    public function getChildCategories($parentId)
+    {
+        return $this->getModel()->where('parent_id', $parentId)->get();
+    }
+
+    /**
      * Specify category tree.
      *
-     * @return \Webkul\Category\Contracts\Category
+     * @return Category
      */
     public function getCategoryTree(?int $id = null)
     {
@@ -142,7 +199,7 @@ class CategoryRepository extends Repository
     /**
      * Specify category tree.
      *
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     public function getCategoryTreeWithoutDescendant(?int $id = null)
     {
@@ -152,36 +209,58 @@ class CategoryRepository extends Repository
     }
 
     /**
-     * Get root categories.
-     *
-     * @return \Illuminate\Support\Collection
-     */
-    public function getRootCategories()
-    {
-        return $this->getModel()->where('parent_id', null)->get();
-    }
-
-    /**
-     * Get child categories.
-     *
-     * @return \Illuminate\Support\Collection
-     */
-    public function getChildCategories($parentId)
-    {
-        return $this->getModel()->where('parent_id', $parentId)->get();
-    }
-
-    /**
      * get visible category tree.
      *
      * @param  int  $id
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     public function getVisibleCategoryTree($id = null)
     {
         return $id
             ? $this->model::orderBy('position', 'ASC')->where('status', 1)->descendantsAndSelf($id)->toTree($id)
             : $this->model::orderBy('position', 'ASC')->where('status', 1)->get()->toTree();
+    }
+
+    /**
+     * Get the IDs of visible categories under the given root (inclusive).
+     *
+     * @param  int|null  $rootId
+     * @return array
+     */
+    public function getVisibleCategoryIds($rootId = null)
+    {
+        $query = $this->model::where('status', 1);
+
+        if ($rootId) {
+            $query = $query->descendantsAndSelf($rootId);
+        }
+
+        return $query->pluck('id')->all();
+    }
+
+    /**
+     * Get partials.
+     *
+     * @param  array|null  $columns
+     * @return array
+     */
+    public function getPartial($columns = null)
+    {
+        $categories = $this->model->all();
+
+        $trimmed = [];
+
+        foreach ($categories as $key => $category) {
+            if (! empty($category->name)) {
+                $trimmed[$key] = [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'slug' => $category->slug,
+                ];
+            }
+        }
+
+        return $trimmed;
     }
 
     /**
@@ -203,60 +282,20 @@ class CategoryRepository extends Repository
     }
 
     /**
-     * Retrieve category from slug.
-     *
-     * @param  string  $slug
-     * @return \Webkul\Category\Contracts\Category
-     */
-    public function findBySlug($slug)
-    {
-        if ($category = $this->model->whereTranslation('slug', $slug)->first()) {
-            return $category;
-        }
-    }
-
-    /**
-     * Retrieve category from slug.
-     *
-     * @param  string  $slug
-     * @return \Webkul\Category\Contracts\Category
-     */
-    public function findBySlugOrFail($slug)
-    {
-        return $this->model->whereTranslation('slug', $slug)->firstOrFail();
-    }
-
-    /**
      * Upload category's images.
      *
      * @param  array  $data
-     * @param  \Webkul\Category\Contracts\Category  $category
+     * @param  Category  $category
      * @param  string  $type
      * @return void
      */
     public function uploadImages($data, $category, $type = 'logo_path')
     {
-        if (isset($data[$type])) {
-            foreach ($data[$type] as $imageId => $image) {
-                $file = $type.'.'.$imageId;
+        $prefix = Str::before($type, '_path');
 
-                if (request()->hasFile($file)) {
-                    if ($category->{$type}) {
-                        Storage::delete($category->{$type});
-                    }
+        $meta = collect($data[$prefix.'_meta'] ?? [])->first() ?? [];
 
-                    $manager = new ImageManager;
-
-                    $image = $manager->make(request()->file($file))->encode('webp');
-
-                    $category->{$type} = 'category/'.$category->id.'/'.Str::random(40).'.webp';
-
-                    Storage::put($category->{$type}, $image);
-
-                    $category->save();
-                }
-            }
-        } else {
+        if (! isset($data[$type])) {
             if ($category->{$type}) {
                 Storage::delete($category->{$type});
             }
@@ -264,32 +303,78 @@ class CategoryRepository extends Repository
             $category->{$type} = null;
 
             $category->save();
+
+            $this->clearMediaAltText($category, $prefix.'_alt');
+
+            return;
+        }
+
+        foreach ($data[$type] as $imageId => $image) {
+            $file = $type.'.'.$imageId;
+
+            if (request()->hasFile($file)) {
+                if ($category->{$type}) {
+                    Storage::delete($category->{$type});
+                }
+
+                $encoded = image_manager()->read(request()->file($file))->encodeByExtension('webp');
+
+                $category->{$type} = $this->mediaFileName->resolve(
+                    'category/'.$category->id,
+                    $meta['file_name'] ?? null,
+                    'webp'
+                );
+
+                Storage::put($category->{$type}, (string) $encoded);
+
+                $category->save();
+            } elseif ($category->{$type}) {
+                $renamed = $this->mediaFileName->rename($category->{$type}, $meta['file_name'] ?? null);
+
+                if ($renamed !== $category->{$type}) {
+                    $category->{$type} = $renamed;
+
+                    $category->save();
+                }
+            }
+        }
+
+        if (array_key_exists('alt_text', $meta)) {
+            $this->saveMediaAltText($category, $prefix.'_alt', $meta['alt_text']);
         }
     }
 
     /**
-     * Get partials.
+     * Save the alt text of a category image, for the requested locale.
      *
-     * @param  array|null  $columns
-     * @return array
+     * @param  Category  $category
      */
-    public function getPartial($columns = null)
+    protected function saveMediaAltText($category, string $attribute, ?string $altText): void
     {
-        $categories = $this->model->all();
-
-        $trimmed = [];
-
-        foreach ($categories as $key => $category) {
-            if (! empty($category->name)) {
-                $trimmed[$key] = [
-                    'id'   => $category->id,
-                    'name' => $category->name,
-                    'slug' => $category->slug,
-                ];
+        foreach (core()->getRequestedLocaleCodes() as $localeCode) {
+            if (! $translation = $category->translate($localeCode)) {
+                continue;
             }
+
+            $translation->{$attribute} = $altText;
         }
 
-        return $trimmed;
+        $category->save();
+    }
+
+    /**
+     * Drop the alt text of a category image across every locale, used when the image
+     * itself is removed.
+     *
+     * @param  Category  $category
+     */
+    protected function clearMediaAltText($category, string $attribute): void
+    {
+        foreach ($category->translations as $translation) {
+            $translation->{$attribute} = null;
+
+            $translation->save();
+        }
     }
 
     /**

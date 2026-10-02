@@ -31,13 +31,16 @@ it('should fail the validation with errors when certain field not provided when 
 
 it('should store the newly created exchange rates', function () {
     // Arrange.
-    $currency = Currency::first();
+    $currency = Currency::factory()->create([
+        'code' => 'EUR',
+        'name' => 'Euro',
+    ]);
 
     // Act and Assert.
     $this->loginAsAdmin();
 
     postJson(route('admin.settings.exchange_rates.store'), [
-        'rate'            => $rate = rand(1, 100),
+        'rate' => $rate = rand(1, 100),
         'target_currency' => $currency->id,
     ])
         ->assertOk()
@@ -46,7 +49,7 @@ it('should store the newly created exchange rates', function () {
     $this->assertModelWise([
         CurrencyExchangeRate::class => [
             [
-                'rate'            => $rate,
+                'rate' => $rate,
                 'target_currency' => $currency->id,
             ],
         ],
@@ -95,8 +98,8 @@ it('should update the currency exchange rate', function () {
     $this->loginAsAdmin();
 
     putJson(route('admin.settings.exchange_rates.update'), [
-        'id'              => $exchangeRate->id,
-        'rate'            => $rate = rand(1, 100),
+        'id' => $exchangeRate->id,
+        'rate' => $rate = rand(1, 100),
         'target_currency' => $exchangeRate->target_currency,
     ])
         ->assertOk()
@@ -105,7 +108,7 @@ it('should update the currency exchange rate', function () {
     $this->assertModelWise([
         CurrencyExchangeRate::class => [
             [
-                'rate'            => $rate,
+                'rate' => $rate,
                 'target_currency' => $exchangeRate->target_currency,
             ],
         ],

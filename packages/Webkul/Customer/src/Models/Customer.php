@@ -3,12 +3,15 @@
 namespace Webkul\Customer\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\hasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Laravel\Sanctum\HasApiTokens;
-use Shetabit\Visitor\Traits\Visitor;
 use Webkul\Checkout\Models\CartProxy;
 use Webkul\Core\Models\ChannelProxy;
 use Webkul\Core\Models\SubscribersListProxy;
@@ -21,7 +24,7 @@ use Webkul\Shop\Mail\Customer\ResetPasswordNotification;
 
 class Customer extends Authenticatable implements CustomerContract
 {
-    use HasApiTokens, HasFactory, Notifiable, Visitor;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The table associated with the model.
@@ -141,7 +144,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get the customer group that owns the customer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo
      */
     public function group()
     {
@@ -151,7 +154,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get the customer address that owns the customer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
     public function addresses()
     {
@@ -161,7 +164,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get default customer address that owns the customer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasOne
+     * @return HasOne
      */
     public function default_address()
     {
@@ -172,7 +175,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Customer's relation with invoice .
      *
-     * @return \Illuminate\Database\Eloquent\Relations\hasManyThrough
+     * @return hasManyThrough
      */
     public function invoices()
     {
@@ -182,7 +185,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Customer's relation with wishlist items.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
     public function wishlist_items()
     {
@@ -212,7 +215,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get all cart inactive cart instance of a customer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
     public function all_carts()
     {
@@ -222,7 +225,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get inactive cart instance of a customer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
     public function inactive_carts()
     {
@@ -233,7 +236,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get active cart instance of a customer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
     public function active_carts()
     {
@@ -244,7 +247,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get all orders of a customer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
     public function orders()
     {
@@ -254,7 +257,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get all reviews of a customer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
     public function reviews()
     {
@@ -264,7 +267,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get all notes of a customer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     * @return HasMany
      */
     public function notes()
     {
@@ -274,7 +277,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get the customer's subscription.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\HasOne
+     * @return HasOne
      */
     public function subscription()
     {
@@ -284,7 +287,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Get the channel that owns the customer.
      *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * @return BelongsTo
      */
     public function channel()
     {
@@ -294,7 +297,7 @@ class Customer extends Authenticatable implements CustomerContract
     /**
      * Create a new factory instance for the model.
      *
-     * @return \Webkul\Customer\Database\Factories\CustomerFactory
+     * @return CustomerFactory
      */
     protected static function newFactory()
     {

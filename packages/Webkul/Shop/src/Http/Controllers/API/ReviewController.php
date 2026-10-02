@@ -62,10 +62,10 @@ class ReviewController extends APIController
     public function store(int $id): JsonResource
     {
         $this->validate(request(), [
-            'title'         => 'required',
-            'comment'       => 'required',
-            'rating'        => 'required|numeric|min:1|max:5',
-            'attachments'   => 'array',
+            'title' => 'required',
+            'comment' => 'required',
+            'rating' => 'required|numeric|min:1|max:5',
+            'attachments' => 'array',
             'attachments.*' => 'file|mimetypes:image/*,video/*',
         ]);
 
@@ -75,8 +75,8 @@ class ReviewController extends APIController
             'rating',
         ]), [
             'attachments' => request()->file('attachments') ?? [],
-            'status'      => self::STATUS_PENDING,
-            'product_id'  => $id,
+            'status' => self::STATUS_PENDING,
+            'product_id' => $id,
         ]);
 
         $data['name'] = auth()->guard('customer')->user()?->name ?? request()->input('name');
@@ -108,28 +108,9 @@ class ReviewController extends APIController
             ], 400);
         }
 
-        $currentLocale = core()->getCurrentLocale();
-
-        $prompt = "
-        Translate the following product review to $currentLocale->name. Ensure that the translation retains the sentiment and conveys the meaning accurately. If specific product-related terms or expressions are commonly used in the $currentLocale->name, please adapt accordingly.
-        ---
-
-        **Original Product Review:**
-        $review->comment
-
-        ---
-        Translation:
-        ";
-
         try {
-            $model = core()->getConfigData('general.magic_ai.review_translation.model');
-
-            $response = MagicAI::setModel($model)
-                ->setPrompt($prompt)
-                ->ask();
-
             return new JsonResponse([
-                'content' => $response,
+                'content' => MagicAI::translate($review->comment, core()->getCurrentLocale()->name),
             ]);
         } catch (\Exception $e) {
             return new JsonResponse([
@@ -144,7 +125,7 @@ class ReviewController extends APIController
     private function censorReviewerName(string $name): string
     {
         return collect(explode(' ', $name))
-            ->map(fn ($part) => substr($part, 0, 1).str_repeat('*', max(strlen($part) - 1, 0)))
+            ->map(fn ($part) => mb_substr($part, 0, 1).str_repeat('*', max(mb_strlen($part) - 1, 0)))
             ->join(' ');
     }
 }

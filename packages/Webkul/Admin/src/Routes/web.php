@@ -40,6 +40,11 @@ Route::group(['middleware' => ['admin', NoCacheMiddleware::class], 'prefix' => c
     require 'reporting-routes.php';
 
     /**
+     * Appearance routes.
+     */
+    require 'appearance-routes.php';
+
+    /**
      * Settings routes.
      */
     require 'settings-routes.php';
@@ -53,6 +58,11 @@ Route::group(['middleware' => ['admin', NoCacheMiddleware::class], 'prefix' => c
      * Notification routes.
      */
     require 'notification-routes.php';
+
+    /**
+     * Help & Resources routes.
+     */
+    require 'help-routes.php';
 
     /**
      * Remaining routes.

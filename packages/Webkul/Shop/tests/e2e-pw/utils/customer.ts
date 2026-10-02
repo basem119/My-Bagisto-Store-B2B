@@ -18,25 +18,21 @@ export async function register(page) {
     await page.goto("");
     await page.getByLabel("Profile").click();
     await page.getByRole("link", { name: "Sign Up" }).click();
-    await page.getByPlaceholder("First Name").click();
+    await page.waitForLoadState("networkidle");
     await page.getByPlaceholder("First Name").fill(credentials.firstName);
-    await page.getByPlaceholder("Last Name").click();
     await page.getByPlaceholder("Last Name").fill(credentials.lastName);
-    await page.getByPlaceholder("email@example.com").click();
     await page.getByPlaceholder("email@example.com").fill(credentials.email);
-    await page.getByPlaceholder("Password", { exact: true }).click();
     await page
         .getByPlaceholder("Password", { exact: true })
         .fill(credentials.password);
-    await page.getByPlaceholder("Confirm Password").click();
     await page.getByPlaceholder("Confirm Password").fill(credentials.password);
 
-    const agreementLocator = page.locator('#agreement').nth(1);
-    
+    const agreementLocator = page.locator("#agreement").nth(1);
+
     const isVisible = await agreementLocator.isVisible();
 
     if (isVisible) {
-        await page.getByText('I agree with this statement.').click();
+        await page.getByText("I agree with this statement.").click();
     }
 
     await page
@@ -47,13 +43,9 @@ export async function register(page) {
         .click();
     await page.getByRole("button", { name: "Register" }).click();
 
-    await expect(
-        page
-            .getByText(
-                "Account created successfully."
-            )
-            .first()
-    ).toBeVisible();
+    await expect(page.locator("body")).toContainText(
+        "Account created successfully"
+    );
 
     return credentials;
 }
@@ -64,13 +56,14 @@ export async function loginAsCustomer(page) {
     await page.goto("");
     await page.getByLabel("Profile").click();
     await page.getByRole("link", { name: "Sign In" }).click();
-    await page.getByPlaceholder("email@example.com").click();
+    await page.waitForLoadState("networkidle");
     await page.getByPlaceholder("email@example.com").fill(credentials.email);
     await page.getByPlaceholder("email@example.com").press("Tab");
-    await page.getByPlaceholder("Password").fill(credentials.password);    const agreementLocator = page.locator('#agreement').nth(1);
+    await page.getByPlaceholder("Password").fill(credentials.password);
+    const agreementLocator = page.locator("#agreement").nth(1);
     const isVisible = await agreementLocator.isVisible();
     if (isVisible) {
-        await page.getByText('I agree with this statement.').click();
+        await page.getByText("I agree with this statement.").click();
     }
     await page.getByRole("button", { name: "Sign In" }).click();
 
@@ -80,8 +73,9 @@ export async function loginAsCustomer(page) {
 export async function addAddress(page) {
     await page.getByLabel("Profile").click();
     await page.getByRole("link", { name: "Profile" }).click();
-    await page.getByRole("link", { name: " Address " }).click();
+    await page.getByRole("link", { name: "Address" }).click();
     await page.getByRole("link", { name: "Add Address" }).click();
+    await page.waitForLoadState("networkidle");
     await page.getByPlaceholder("Company Name").click();
     await page.getByPlaceholder("Company Name").fill(generateName());
     await page.getByPlaceholder("Company Name").press("Tab");
@@ -125,13 +119,9 @@ export async function addAddress(page) {
 }
 
 export async function addWishlist(page) {
+    await page.getByPlaceholder("Search products here").fill("simple");
+    await page.getByPlaceholder("Search products here").press("Enter");
     await page.locator(".action-items > span").first().click();
-    await page
-        .locator(
-            "div:nth-child(9) > div:nth-child(2) > div > .-mt-9 > .action-items > span"
-        )
-        .first()
-        .click();
 
     await expect(
         page.getByText("Item Successfully Added To Wishlist").first()

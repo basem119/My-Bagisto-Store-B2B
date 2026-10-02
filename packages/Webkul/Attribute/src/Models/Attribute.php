@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Webkul\Attribute\Contracts\Attribute as AttributeContract;
 use Webkul\Attribute\Database\Factories\AttributeFactory;
 use Webkul\Core\Eloquent\TranslatableModel;
+use Webkul\Core\Rules\Regex;
 
 class Attribute extends TranslatableModel implements AttributeContract
 {
@@ -43,17 +44,17 @@ class Attribute extends TranslatableModel implements AttributeContract
      * @var array
      */
     public $attributeTypeFields = [
-        'text'        => 'text_value',
-        'textarea'    => 'text_value',
-        'price'       => 'float_value',
-        'boolean'     => 'boolean_value',
-        'select'      => 'integer_value',
+        'text' => 'text_value',
+        'textarea' => 'text_value',
+        'price' => 'float_value',
+        'boolean' => 'boolean_value',
+        'select' => 'integer_value',
         'multiselect' => 'text_value',
-        'datetime'    => 'datetime_value',
-        'date'        => 'date_value',
-        'file'        => 'text_value',
-        'image'       => 'text_value',
-        'checkbox'    => 'text_value',
+        'datetime' => 'datetime_value',
+        'date' => 'date_value',
+        'file' => 'text_value',
+        'image' => 'text_value',
+        'checkbox' => 'text_value',
     ];
 
     /**
@@ -118,7 +119,9 @@ class Attribute extends TranslatableModel implements AttributeContract
         }
 
         if ($this->validation == 'regex') {
-            $validations[] = 'regex: '.$this->regex;
+            if (Regex::isUsable($this->regex)) {
+                $validations[] = 'regex: '.$this->regex;
+            }
         } elseif ($this->validation) {
             $validations[] = $this->validation.': true';
         }

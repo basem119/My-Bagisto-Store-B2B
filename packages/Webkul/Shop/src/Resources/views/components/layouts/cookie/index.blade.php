@@ -17,13 +17,19 @@
                     :class="getPositionClasses(position)"
                 >
                     <div class="cookieTitle">
-                        <span class="mb-1.5 block font-sans text-xl leading-5 text-white">
+                        <span
+                            class="mb-1.5 block font-sans text-xl leading-5 text-white"
+                            v-pre
+                        >
                             {{ core()->getConfigData('general.gdpr.cookie.static_block_identifier') }}
                         </span>
                     </div>
 
                     <div class="cookieDesc cookie-consent__message">
-                        <p class="mt-2.5 block font-sans text-sm leading-5 text-white">
+                        <p
+                            class="mt-2.5 block font-sans text-sm leading-5 text-white"
+                            v-pre
+                        >
                             {{ core()->getConfigData('general.gdpr.cookie.description') }}
 
                             <a
@@ -38,14 +44,14 @@
                     <div class="cookieButton">
                         <div class="mt-2.5 flex gap-2">
                             <button
-                                class="box-border inline-block w-full cursor-pointer rounded bg-red-500 px-6 py-4 text-center font-sans text-sm font-bold text-white transition-colors duration-300 ease-in-out hover:bg-red-400 hover:text-white"
+                                class="box-border inline-block w-full cursor-pointer rounded bg-blue-500 px-6 py-4 text-center font-sans text-sm font-bold text-white transition-colors duration-300 ease-in-out hover:bg-blue-400 hover:text-white"
                                 @click="createCookie()"
                             >
                                 @lang('shop::app.components.layouts.cookie.index.accept')
                             </button>
 
                             <button
-                                class="box-border inline-block w-full cursor-pointer rounded bg-red-500 px-6 py-4 text-center font-sans text-sm font-bold text-white transition-colors duration-300 ease-in-out hover:bg-red-400 hover:text-white"
+                                class="box-border inline-block w-full cursor-pointer rounded bg-blue-500 px-6 py-4 text-center font-sans text-sm font-bold text-white transition-colors duration-300 ease-in-out hover:bg-blue-400 hover:text-white"
                                 @click="rejectCookie()"
                             >
                                 @lang('shop::app.components.layouts.cookie.index.reject')
@@ -53,7 +59,7 @@
                         </div>
 
                         <a
-                            class="mt-2.5 box-border inline-block w-full cursor-pointer rounded bg-red-500 px-6 py-4 text-center font-sans text-sm font-bold text-white transition-colors duration-300 ease-in-out hover:bg-red-400 hover:text-white"
+                            class="mt-2.5 box-border inline-block w-full cursor-pointer rounded bg-blue-500 px-6 py-4 text-center font-sans text-sm font-bold text-white transition-colors duration-300 ease-in-out hover:bg-blue-400 hover:text-white"
                             href="{{ route('shop.customers.gdpr.cookie-consent') }}"
                         >
                             @lang('shop::app.components.layouts.cookie.index.learn-more-and-customize')

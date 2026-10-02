@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Storage;
 use Kalnoy\Nestedset\NodeTrait;
-use Shetabit\Visitor\Traits\Visitable;
 use Webkul\Attribute\Models\AttributeProxy;
 use Webkul\Category\Contracts\Category as CategoryContract;
 use Webkul\Category\Database\Factories\CategoryFactory;
@@ -16,7 +15,7 @@ use Webkul\Product\Models\ProductProxy;
 
 class Category extends TranslatableModel implements CategoryContract
 {
-    use HasFactory, NodeTrait, Visitable;
+    use HasFactory, NodeTrait;
 
     /**
      * Translated attributes.
@@ -30,6 +29,8 @@ class Category extends TranslatableModel implements CategoryContract
         'meta_title',
         'meta_description',
         'meta_keywords',
+        'logo_alt',
+        'banner_alt',
     ];
 
     /**
@@ -122,6 +123,26 @@ class Category extends TranslatableModel implements CategoryContract
         }
 
         return Storage::url($this->banner_path);
+    }
+
+    /**
+     * Get the logo file name, without the directory and the extension.
+     *
+     * @return string
+     */
+    public function getLogoFileNameAttribute()
+    {
+        return pathinfo((string) $this->logo_path, PATHINFO_FILENAME);
+    }
+
+    /**
+     * Get the banner file name, without the directory and the extension.
+     *
+     * @return string
+     */
+    public function getBannerFileNameAttribute()
+    {
+        return pathinfo((string) $this->banner_path, PATHINFO_FILENAME);
     }
 
     /**

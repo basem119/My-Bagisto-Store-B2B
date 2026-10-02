@@ -4,6 +4,7 @@ namespace Webkul\Product\Type;
 
 use Webkul\Attribute\Repositories\AttributeRepository;
 use Webkul\Customer\Repositories\CustomerRepository;
+use Webkul\Product\Contracts\Product;
 use Webkul\Product\Helpers\Indexers\Price\Grouped as GroupedIndexer;
 use Webkul\Product\Repositories\ProductAttributeValueRepository;
 use Webkul\Product\Repositories\ProductCustomerGroupPriceRepository;
@@ -81,7 +82,7 @@ class Grouped extends AbstractType
      *
      * @param  int  $id
      * @param  array  $attributes
-     * @return \Webkul\Product\Contracts\Product
+     * @return Product
      */
     public function update(array $data, $id, $attributes = [])
     {
@@ -106,7 +107,7 @@ class Grouped extends AbstractType
     {
         parent::copyRelationships($product);
 
-        $attributesToSkip = config('products.skipAttributesOnCopy') ?? [];
+        $attributesToSkip = config('products.copy.skip_attributes') ?? [];
 
         if (in_array('grouped_products', $attributesToSkip)) {
             return;
@@ -180,7 +181,7 @@ class Grouped extends AbstractType
     {
         return view('shop::products.prices.grouped', [
             'product' => $this->product,
-            'prices'  => $this->getProductPrices(),
+            'prices' => $this->getProductPrices(),
         ])->render();
     }
 
@@ -214,7 +215,7 @@ class Grouped extends AbstractType
 
             $cartProducts = $product->getTypeInstance()->prepareForCart([
                 'product_id' => $productId,
-                'quantity'   => $qty,
+                'quantity' => $qty,
             ]);
 
             if (is_string($cartProducts)) {

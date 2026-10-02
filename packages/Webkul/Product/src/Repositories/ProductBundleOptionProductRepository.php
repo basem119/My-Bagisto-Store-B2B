@@ -4,6 +4,7 @@ namespace Webkul\Product\Repositories;
 
 use Illuminate\Support\Str;
 use Webkul\Core\Eloquent\Repository;
+use Webkul\Product\Contracts\ProductBundleOption;
 
 class ProductBundleOptionProductRepository extends Repository
 {
@@ -17,7 +18,7 @@ class ProductBundleOptionProductRepository extends Repository
 
     /**
      * @param  array  $data
-     * @param  \Webkul\Product\Contracts\ProductBundleOption  $productBundleOption
+     * @param  ProductBundleOption  $productBundleOption
      * @return void
      */
     public function saveBundleOptionProducts($data, $productBundleOption)
@@ -37,7 +38,7 @@ class ProductBundleOptionProductRepository extends Repository
                      * existing option product otherwise we will create a new option product.
                      */
                     $bundleOptionProduct = $this->firstWhere([
-                        'product_id'               => $bundleOptionProductInputs['product_id'],
+                        'product_id' => $bundleOptionProductInputs['product_id'],
                         'product_bundle_option_id' => $productBundleOption->id,
                     ]);
 

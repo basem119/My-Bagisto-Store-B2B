@@ -33,7 +33,7 @@
             >
                 <img
                     src="{{ core()->getCurrentChannel()->logo_url ?? bagisto_asset('images/logo.svg') }}"
-                    alt="{{ config('app.name') }}"
+                    alt="{{ core()->getCurrentChannel()->logo_alt ?: config('app.name') }}"
                     width="131"
                     height="29"
                 >
@@ -177,7 +177,7 @@
                         <x-shop::form.control-group>
                             {!! \Webkul\Customer\Facades\Captcha::render() !!}
 
-                            <x-shop::form.control-group.error control-name="g-recaptcha-response" />
+                            <x-shop::form.control-group.error control-name="recaptcha_token" />
                         </x-shop::form.control-group>
                     @endif
 
@@ -224,6 +224,7 @@
                             <label
                                 class="cursor-pointer select-none text-base text-zinc-500 max-sm:text-sm"
                                 for="agreement"
+                                v-pre
                             >
                                 {{ core()->getConfigData('general.gdpr.agreement.agreement_label') }}
                             </label>
@@ -293,5 +294,5 @@
                 {!! core()->getConfigData('general.gdpr.agreement.agreement_content') !!}
             </div>
         </x-slot>
-    </x-admin::modal>
+    </x-shop::modal>
 </x-shop::layouts>

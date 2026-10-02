@@ -21,9 +21,11 @@
 @endPush
 
 @push('scripts')
-    <script>
-        localStorage.setItem('categories', JSON.stringify(@json($categories)));
-    </script>
+    @if(! empty($categories))
+        <script>
+            localStorage.setItem('categories', JSON.stringify(@json($categories)));
+        </script>
+    @endif
 @endpush
 
 <x-shop::layouts>
@@ -32,13 +34,28 @@
         {{  $channel->home_seo['meta_title'] ?? '' }}
     </x-slot>
 
-    <!-- Loop over the theme customization -->
-    @foreach ($customizations as $customization)
-        @php ($data = $customization->options) @endphp
+    <!-- Loop over the storefront sections -->
+    @foreach ($sections as $section)
+        @php ($data = $section->options) @endphp
 
-        <!-- Static content -->
-        @switch ($customization->type)
-            @case ($customization::IMAGE_CAROUSEL)
+        {{-- Only the types this page renders; the layout marks the ones it draws. --}}
+        @php ($marks = ($preview ?? false) && in_array($section->type, [
+            $section::IMAGE_CAROUSEL,
+            $section::STATIC_CONTENT,
+            $section::CATEGORY_CAROUSEL,
+            $section::PRODUCT_CAROUSEL,
+        ]))
+
+        @if ($marks)
+            <div
+                data-section-id="{{ $section->id }}"
+                data-section-name="{{ $section->name }}"
+            >
+        @endif
+
+        <!-- Static Content -->
+        @switch ($section->type)
+            @case ($section::IMAGE_CAROUSEL)
                 <!-- Image Carousel -->
                 <x-shop::carousel
                     :options="$data"
@@ -46,23 +63,23 @@
                 />
 
                 @break
-            @case ($customization::STATIC_CONTENT)
-                <!-- push style -->
+            @case ($section::STATIC_CONTENT)
+                <!-- Push Style -->
                 @if (! empty($data['css']))
                     @push ('styles')
                         <style>
-                            {{ $data['css'] }}
+                            {!! $data['css'] !!}
                         </style>
                     @endpush
                 @endif
 
-                <!-- render html -->
+                <!-- Render HTML -->
                 @if (! empty($data['html']))
                     {!! $data['html'] !!}
                 @endif
 
                 @break
-            @case ($customization::CATEGORY_CAROUSEL)
+            @case ($section::CATEGORY_CAROUSEL)
                 <!-- Categories carousel -->
                 <x-shop::categories.carousel
                     :title="$data['title'] ?? ''"
@@ -72,7 +89,7 @@
                 />
 
                 @break
-            @case ($customization::PRODUCT_CAROUSEL)
+            @case ($section::PRODUCT_CAROUSEL)
                 <!-- Product Carousel -->
                 <x-shop::products.carousel
                     :title="$data['title'] ?? ''"
@@ -83,5 +100,13 @@
 
                 @break
         @endswitch
+
+        @if ($marks)
+            </div>
+        @endif
     @endforeach
+
+    @if ($preview ?? false)
+        @include('shop::home.preview-bridge')
+    @endif
 </x-shop::layouts>

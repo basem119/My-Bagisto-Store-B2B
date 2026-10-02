@@ -1,5 +1,19 @@
 <?php
 
+use Webkul\Admin\Tests\AdminTestCase;
+use Webkul\Core\Tests\CoreTestCase;
+use Webkul\Customer\Tests\CustomerTestCase;
+use Webkul\DataGrid\Tests\DataGridTestCase;
+use Webkul\EUWithdrawal\Tests\EUWithdrawalTestCase;
+use Webkul\FPC\Tests\FPCTestCase;
+use Webkul\Installer\Tests\InstallerTestCase;
+use Webkul\PayGlocal\Tests\PayGlocalTestCase;
+use Webkul\Payment\Tests\PaymentTestCase;
+use Webkul\PayU\Tests\PayUTestCase;
+use Webkul\Razorpay\Tests\RazorpayTestCase;
+use Webkul\Shop\Tests\ShopTestCase;
+use Webkul\Stripe\Tests\StripeTestCase;
+
 ini_set('memory_limit', '1024M');
 
 /*
@@ -13,10 +27,19 @@ ini_set('memory_limit', '1024M');
 |
 */
 
-uses(Webkul\Admin\Tests\AdminTestCase::class)->in('../packages/Webkul/Admin/tests');
-uses(Webkul\Core\Tests\CoreTestCase::class)->in('../packages/Webkul/Core/tests');
-uses(Webkul\DataGrid\Tests\DataGridTestCase::class)->in('../packages/Webkul/DataGrid/tests');
-uses(Webkul\Shop\Tests\ShopTestCase::class)->in('../packages/Webkul/Shop/tests');
+uses(AdminTestCase::class)->in('../packages/Webkul/Admin/tests');
+uses(CoreTestCase::class)->in('../packages/Webkul/Core/tests');
+uses(CustomerTestCase::class)->in('../packages/Webkul/Customer/tests');
+uses(DataGridTestCase::class)->in('../packages/Webkul/DataGrid/tests');
+uses(EUWithdrawalTestCase::class)->in('../packages/Webkul/EUWithdrawal/tests');
+uses(FPCTestCase::class)->in('../packages/Webkul/FPC/tests');
+uses(InstallerTestCase::class)->in('../packages/Webkul/Installer/tests');
+uses(PayGlocalTestCase::class)->in('../packages/Webkul/PayGlocal/tests');
+uses(PaymentTestCase::class)->in('../packages/Webkul/Payment/tests');
+uses(PayUTestCase::class)->in('../packages/Webkul/PayU/tests');
+uses(RazorpayTestCase::class)->in('../packages/Webkul/Razorpay/tests');
+uses(ShopTestCase::class)->in('../packages/Webkul/Shop/tests');
+uses(StripeTestCase::class)->in('../packages/Webkul/Stripe/tests');
 
 /*
 |--------------------------------------------------------------------------

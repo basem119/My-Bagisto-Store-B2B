@@ -2,12 +2,15 @@
 
 namespace Webkul\Shop\Http\Controllers;
 
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\View\View;
 use Webkul\Category\Repositories\CategoryRepository;
+use Webkul\Core\Http\Middleware\SecureHeaders;
 use Webkul\Shop\Http\Requests\ContactRequest;
 use Webkul\Shop\Http\Resources\CategoryTreeResource;
 use Webkul\Shop\Mail\ContactUs;
-use Webkul\Theme\Repositories\ThemeCustomizationRepository;
+use Webkul\Theme\Repositories\SectionRepository;
 
 class HomeController extends Controller
 {
@@ -21,28 +24,56 @@ class HomeController extends Controller
      *
      * @return void
      */
-    public function __construct(protected ThemeCustomizationRepository $themeCustomizationRepository, protected CategoryRepository $categoryRepository) {}
+    public function __construct(protected SectionRepository $sectionRepository, protected CategoryRepository $categoryRepository) {}
 
     /**
      * Loads the home page for the storefront.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function index()
     {
-        visitor()->visit();
-
-        $customizations = $this->themeCustomizationRepository->orderBy('sort_order')->findWhere([
-            'status'     => self::STATUS,
-            'channel_id' => core()->getCurrentChannel()->id,
-            'theme_code' => core()->getCurrentChannel()->theme,
-        ]);
+        $sections = $this->sectionRepository->getRenderable(
+            core()->getCurrentChannel()->id,
+            core()->getCurrentChannel()->theme
+        );
 
         $categories = $this->categoryRepository->getVisibleCategoryTree(core()->getCurrentChannel()->root_category_id);
 
         $categories = CategoryTreeResource::collection($categories);
 
-        return view('shop::home.index', compact('customizations', 'categories'));
+        return view('shop::home.index', compact('sections', 'categories'));
+    }
+
+    /**
+     * Render the home page from unpublished section edits, for the appearance editor.
+     *
+     * @return View
+     */
+    public function preview()
+    {
+        abort_unless(bouncer()->hasPermission('appearance.sections'), 403);
+
+        request()->attributes->set(SecureHeaders::FRAMABLE, true);
+
+        request()->attributes->set(SectionRepository::PREVIEWING, true);
+
+        $channel = core()->getAllChannels()->firstWhere('id', (int) request('channel'))
+            ?? core()->getCurrentChannel();
+
+        core()->setCurrentChannel($channel);
+
+        $sections = $this->sectionRepository->getDraftedForPreview(
+            $channel->id,
+            $channel->theme,
+            app()->getLocale()
+        );
+
+        $categories = CategoryTreeResource::collection(
+            $this->categoryRepository->getVisibleCategoryTree($channel->root_category_id)
+        );
+
+        return view('shop::home.index', compact('sections', 'categories') + ['preview' => true]);
     }
 
     /**
@@ -58,7 +89,7 @@ class HomeController extends Controller
     /**
      * Summary of contact.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function contactUs()
     {
@@ -68,7 +99,7 @@ class HomeController extends Controller
     /**
      * Summary of store.
      *
-     * @return \Illuminate\Http\RedirectResponse
+     * @return RedirectResponse
      */
     public function sendContactUsMail(ContactRequest $contactRequest)
     {

@@ -31,7 +31,7 @@ it('should return listing items of attributes', function () {
         ->assertOk()
         ->assertJsonPath('records.0.id', $attribute->id)
         ->assertJsonPath('records.0.code', $attribute->code)
-        ->assertJsonPath('meta.total', 29);
+        ->assertJsonPath('meta.total', 31);
 });
 
 it('should returns attributes options', function () {
@@ -72,9 +72,9 @@ it('should store newly created attribute', function () {
     $this->loginAsAdmin();
 
     postJson(route('admin.catalog.attributes.store'), $data = [
-        'admin_name'    => fake()->name(),
-        'code'          => fake()->numerify('code########'),
-        'type'          => 'text',
+        'admin_name' => fake()->name(),
+        'code' => fake()->numerify('code########'),
+        'type' => 'text',
         'default_value' => 1,
     ])
         ->assertRedirectToRoute('admin.catalog.attributes.index')
@@ -119,9 +119,9 @@ it('should update an attribute', function () {
     $this->loginAsAdmin();
 
     putJson(route('admin.catalog.attributes.update', $attribute->id), $data = [
-        'admin_name'    => fake()->name(),
-        'code'          => $attribute->code,
-        'type'          => $attribute->type,
+        'admin_name' => fake()->name(),
+        'code' => $attribute->code,
+        'type' => $attribute->type,
         'default_value' => 1,
     ])
         ->assertRedirectToRoute('admin.catalog.attributes.index')
@@ -190,4 +190,66 @@ it('should mass delete attributes', function () {
             'id' => $attribute->id,
         ]);
     }
+});
+
+it('should refuse an attribute whose regex is not a usable pattern', function (string $pattern) {
+    // Act and Assert.
+    $this->loginAsAdmin();
+
+    postJson(route('admin.catalog.attributes.store'), [
+        'code' => 'regex_'.substr(md5($pattern), 0, 8),
+        'admin_name' => 'Regex Probe',
+        'type' => 'text',
+        'validation' => 'regex',
+        'regex' => $pattern,
+    ])
+        ->assertJsonValidationErrorFor('regex')
+        ->assertUnprocessable();
+})->with([
+    '^[A-Za-z0-9]+$',
+    '/[unclosed/',
+    'not a pattern',
+    '#^[A-Za-z0-9]+$#',
+    '~^[A-Za-z0-9]+$~',
+    '/^[A-Za-z0-9]+$/x',
+    '//',
+]);
+
+it('should accept an attribute whose regex is a usable pattern', function () {
+    // Act and Assert.
+    $this->loginAsAdmin();
+
+    postJson(route('admin.catalog.attributes.store'), [
+        'code' => 'regex_usable',
+        'admin_name' => 'Regex Probe',
+        'type' => 'text',
+        'validation' => 'regex',
+        'regex' => '/^[A-Za-z0-9]+$/',
+    ])->assertRedirectToRoute('admin.catalog.attributes.index');
+
+    $this->assertDatabaseHas('attributes', ['code' => 'regex_usable', 'regex' => '/^[A-Za-z0-9]+$/']);
+});
+
+it('should keep an unusable regex out of the rules the product form is given', function (string $pattern) {
+    // Arrange.
+    $attribute = Attribute::factory()->create([
+        'type' => 'text',
+        'validation' => 'regex',
+        'regex' => $pattern,
+    ]);
+
+    // Act and Assert.
+    expect($attribute->validations)->not->toContain('regex');
+})->with(['^[A-Za-z0-9]+$', '#^[A-Za-z0-9]+$#', '~^[A-Za-z0-9]+$~', '/^[A-Za-z0-9]+$/x', '//']);
+
+it('should write a usable regex into the rules the product form is given', function () {
+    // Arrange.
+    $attribute = Attribute::factory()->create([
+        'type' => 'text',
+        'validation' => 'regex',
+        'regex' => '/^[A-Za-z0-9]+$/',
+    ]);
+
+    // Act and Assert.
+    expect($attribute->validations)->toContain('regex: /^[A-Za-z0-9]+$/');
 });

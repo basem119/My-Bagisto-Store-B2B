@@ -1,5 +1,6 @@
 <?php
 
+use Webkul\Marketing\Models\Campaign;
 use Webkul\Marketing\Models\Template;
 
 use function Pest\Laravel\deleteJson;
@@ -56,8 +57,8 @@ it('should store the newly create email template', function () {
     $this->loginAsAdmin();
 
     postJson(route('admin.marketing.communications.email_templates.store', [
-        'name'    => $name = fake()->name(),
-        'status'  => $status = fake()->randomElement(['active', 'inactive', 'draft']),
+        'name' => $name = fake()->name(),
+        'status' => $status = fake()->randomElement(['active', 'inactive', 'draft']),
         'content' => $content = substr(fake()->paragraph(), 0, 50),
     ]))
         ->assertRedirect(route('admin.marketing.communications.email_templates.index'))
@@ -66,8 +67,8 @@ it('should store the newly create email template', function () {
     $this->assertModelWise([
         Template::class => [
             [
-                'name'    => $name,
-                'status'  => $status,
+                'name' => $name,
+                'status' => $status,
                 'content' => $content,
             ],
         ],
@@ -124,8 +125,8 @@ it('should update the existing the template', function () {
     $this->loginAsAdmin();
 
     putJson(route('admin.marketing.communications.email_templates.update', $marketingEmailTemplate->id), $data = [
-        'name'    => $marketingEmailTemplate->name,
-        'status'  => fake()->randomElement(['active', 'inactive', 'draft']),
+        'name' => $marketingEmailTemplate->name,
+        'status' => fake()->randomElement(['active', 'inactive', 'draft']),
         'content' => substr(fake()->paragraph(), 0, 50),
     ])
         ->assertRedirect(route('admin.marketing.communications.email_templates.index'))
@@ -134,8 +135,8 @@ it('should update the existing the template', function () {
     $this->assertModelWise([
         Template::class => [
             [
-                'name'    => $marketingEmailTemplate->name,
-                'status'  => $data['status'],
+                'name' => $marketingEmailTemplate->name,
+                'status' => $data['status'],
                 'content' => $data['content'],
             ],
         ],
@@ -152,4 +153,33 @@ it('should delete the specified email template', function () {
     deleteJson(route('admin.marketing.communications.email_templates.delete', $marketingEmailTemplate->id))
         ->assertOk()
         ->assertSeeText(trans('admin::app.marketing.communications.templates.delete-success'));
+});
+
+it('should refuse to delete an email template a campaign is using', function () {
+    // Arrange.
+    $template = Template::factory()->create();
+
+    Campaign::factory()->create(['marketing_template_id' => $template->id]);
+
+    // Act and Assert.
+    $this->loginAsAdmin();
+
+    deleteJson(route('admin.marketing.communications.email_templates.delete', $template->id))
+        ->assertStatus(400)
+        ->assertJsonPath('message', trans('admin::app.marketing.communications.templates.campaign-associate'));
+
+    $this->assertDatabaseHas('marketing_templates', ['id' => $template->id]);
+});
+
+it('should delete an email template no campaign is using', function () {
+    // Arrange.
+    $template = Template::factory()->create();
+
+    // Act and Assert.
+    $this->loginAsAdmin();
+
+    deleteJson(route('admin.marketing.communications.email_templates.delete', $template->id))
+        ->assertOk();
+
+    $this->assertDatabaseMissing('marketing_templates', ['id' => $template->id]);
 });

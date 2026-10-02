@@ -1,19 +1,28 @@
 <div class="flex flex-col">
-    <p class="font-semibold leading-6 text-gray-800 dark:text-white">
-        {{ $address->company_name ?? '' }}
+    <p 
+        class="font-semibold leading-6 text-gray-800 dark:text-white"
+        v-text="'{{ $address->company_name ?? '' }}'"
+    >
     </p>
 
-    <p class="font-semibold leading-6 text-gray-800 dark:text-white">
-        {{ $address->name }}
+    <p 
+        class="font-semibold leading-6 text-gray-800 dark:text-white"
+        v-text="'{{ $address->name }}'"
+    >
     </p>
 
     @if ($address->vat_id)
-        <p class="font-semibold leading-6 text-gray-800 dark:text-white">
-            {{ $address->vat_id }}
+        <p 
+            class="font-semibold leading-6 text-gray-800 dark:text-white"
+            v-text="'{{ $address->vat_id }}'"
+        >
         </p>
     @endif
 
-    <p class="!leading-6 text-gray-600 dark:text-gray-300">
+    <p 
+        class="!leading-6 text-gray-600 dark:text-gray-300"
+        v-pre
+    >
         {{ $address->address }}<br>
 
         {{ $address->city }}<br>
@@ -22,6 +31,6 @@
 
         {{ core()->country_name($address->country) }} @if ($address->postcode) ({{ $address->postcode }}) @endif<br>
 
-        {{ __('admin::app.sales.orders.view.contact') }} : {{ $address->phone }}
+        {{ trans('admin::app.sales.orders.view.contact') }} : {{ $address->phone }}
     </p>
 </div>

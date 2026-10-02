@@ -48,7 +48,7 @@ class CompareController extends APIController
     /**
      * Method for customers to get products in comparison.
      *
-     * @return \Illuminate\Http\Resources\Json\JsonResource
+     * @return JsonResource
      */
     public function store()
     {
@@ -57,8 +57,8 @@ class CompareController extends APIController
         ]);
 
         $compareProduct = $this->compareItemRepository->findOneByField([
-            'customer_id'  => auth()->guard('customer')->user()->id,
-            'product_id'   => request()->input('product_id'),
+            'customer_id' => auth()->guard('customer')->user()->id,
+            'product_id' => request()->input('product_id'),
         ]);
 
         if ($compareProduct) {
@@ -71,7 +71,7 @@ class CompareController extends APIController
 
         $compareProduct = $this->compareItemRepository->create([
             'customer_id' => auth()->guard('customer')->user()->id,
-            'product_id'  => request()->input('product_id'),
+            'product_id' => request()->input('product_id'),
         ]);
 
         Event::dispatch('customer.compare.create.after', $compareProduct);
@@ -86,13 +86,17 @@ class CompareController extends APIController
      */
     public function destroy(): JsonResource
     {
+        $this->validate(request(), [
+            'product_id' => 'required|integer',
+        ]);
+
         $productId = request()->input('product_id');
 
         Event::dispatch('customer.compare.delete.before', $productId);
 
         $success = $this->compareItemRepository->deleteWhere([
-            'product_id'  => $productId,
             'customer_id' => auth()->guard('customer')->user()->id,
+            'product_id' => $productId,
         ]);
 
         Event::dispatch('customer.compare.delete.after', $productId);
@@ -115,7 +119,7 @@ class CompareController extends APIController
             ->get();
 
         return new JsonResource([
-            'data'    => CompareItemResource::collection($products),
+            'data' => CompareItemResource::collection($products),
             'message' => trans('shop::app.compare.remove-success'),
         ]);
     }

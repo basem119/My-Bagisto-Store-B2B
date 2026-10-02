@@ -8,6 +8,7 @@ use DebugBar\DataCollector\DataCollectorInterface;
 use DebugBar\DataCollector\PDO\PDOCollector;
 use DebugBar\DataCollector\Renderable;
 use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Str;
 use Konekt\Concord\Facades\Concord;
 
@@ -50,17 +51,17 @@ class ModuleCollector extends DataCollector implements AssetProvider, DataCollec
         app()['db']->listen(
             function ($query, $bindings = null, $time = null, $connectionName = null) use ($pdoCollector) {
                 $this->queries[] = [
-                    'sql'          => $this->addQueryBindings($query),
-                    'duration'     => $query->time,
+                    'sql' => $this->addQueryBindings($query),
+                    'duration' => $query->time,
                     'duration_str' => $pdoCollector->formatDuration($query->time),
-                    'connection'   => $query->connection->getDatabaseName(),
+                    'connection' => $query->connection->getDatabaseName(),
                 ];
             }
         );
     }
 
     /**
-     * @param  \Illuminate\Database\Events\QueryExecuted  $query
+     * @param  QueryExecuted  $query
      * @return string
      */
     public function addQueryBindings($query)
@@ -143,16 +144,16 @@ class ModuleCollector extends DataCollector implements AssetProvider, DataCollec
                 || count($queries)
             ) {
                 $modules[] = [
-                    'name'    => $module->getNamespaceRoot(),
-                    'models'  => $models,
-                    'views'   => $views,
+                    'name' => $module->getNamespaceRoot(),
+                    'models' => $models,
+                    'views' => $views,
                     'queries' => $queries,
                 ];
             }
         }
 
         $data = [
-            'count'   => count($modules),
+            'count' => count($modules),
             'modules' => $modules,
         ];
 
@@ -257,15 +258,15 @@ class ModuleCollector extends DataCollector implements AssetProvider, DataCollec
     public function getWidgets()
     {
         return [
-            'modules'       => [
-                'icon'    => 'cubes',
-                'widget'  => 'PhpDebugBar.Widgets.ModulesWidget',
-                'map'     => 'modules',
+            'modules' => [
+                'icon' => 'cubes',
+                'widget' => 'PhpDebugBar.Widgets.ModulesWidget',
+                'map' => 'modules',
                 'default' => '[]',
             ],
 
             'modules:badge' => [
-                'map'     => 'modules.count',
+                'map' => 'modules.count',
                 'default' => 0,
             ],
         ];
@@ -278,9 +279,9 @@ class ModuleCollector extends DataCollector implements AssetProvider, DataCollec
     {
         return [
             'base_path' => __DIR__.'/../Resources/',
-            'base_url'  => __DIR__.'/../Resources/',
-            'css'       => 'widgets/modules/widget.css',
-            'js'        => 'widgets/modules/widget.js',
+            'base_url' => __DIR__.'/../Resources/',
+            'css' => 'widgets/modules/widget.css',
+            'js' => 'widgets/modules/widget.js',
         ];
     }
 }

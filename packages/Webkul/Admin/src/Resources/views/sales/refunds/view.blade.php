@@ -57,7 +57,10 @@
 
                                 <!-- Product Name -->
                                 <div class="grid place-content-start gap-1.5">
-                                    <p class="break-all text-base font-semibold text-gray-800 dark:text-white">
+                                    <p 
+                                        class="break-all text-base font-semibold text-gray-800 dark:text-white"
+                                        v-pre
+                                    >
                                         {{ $item->name }}
                                     </p>
 
@@ -65,7 +68,10 @@
                                     <div class="flex flex-col place-items-start gap-1.5">
                                         @if (isset($item->additional['attributes']))
                                             @foreach ($item->additional['attributes'] as $attribute)
-                                                <p class="text-gray-600 dark:text-gray-300">
+                                                <p
+                                                    class="text-gray-600 dark:text-gray-300"
+                                                    v-pre
+                                                >
                                                     @if (
                                                         ! isset($attribute['attribute_type'])
                                                         || $attribute['attribute_type'] !== 'file'
@@ -89,7 +95,7 @@
 
                                     <!-- Product SKU -->
                                     <p class="text-gray-600 dark:text-gray-300">
-                                        @lang('admin::app.sales.refunds.view.sku', ['sku' => $item->child ? $item->child->sku : $item->sku])
+                                        @lang('admin::app.sales.refunds.view.sku', ['sku' => $item->getTypeInstance()->getOrderedItem($item)->sku])
                                     </p>
 
                                     <!-- Product QTY -->
@@ -307,16 +313,22 @@
                         </p>
                     </x-slot>
 
-                    <x-slot:content>
+                    <x-slot:content v-pre>
                         <!-- Account Info -->
                         <div class="flex flex-col pb-4">
                             <!-- Customer Full Name -->
-                            <p class="font-semibold text-gray-800 dark:text-white">
+                            <p 
+                                class="font-semibold text-gray-800 dark:text-white"
+                                v-pre
+                            >
                                 {{ $refund->order->customer_full_name }}
                             </p>
 
                             <!-- Customer Email -->
-                            <p class="text-gray-600 dark:text-gray-300">
+                            <p 
+                                class="text-gray-600 dark:text-gray-300"
+                                v-pre
+                            >
                                 {{ $refund->order->customer_email }}
                             </p>
                         </div>
@@ -389,7 +401,10 @@
                                 {{ $order->status_label }}
                             </p>
 
-                            <p class="text-gray-600 dark:text-gray-300">
+                            <p 
+                                class="text-gray-600 dark:text-gray-300"
+                                v-pre
+                            >
                                 {{ $order->channel_name }}
                             </p>
                         </div>
@@ -424,7 +439,10 @@
                                 </a>
                             </p>
 
-                            <p class="text-gray-600 dark:text-gray-300">
+                            <p 
+                                class="text-gray-600 dark:text-gray-300"
+                                v-pre
+                            >
                                 {{ $order->shipping_title ?? 'N/A' }}
                             </p>
 

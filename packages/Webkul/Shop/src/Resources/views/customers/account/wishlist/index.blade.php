@@ -114,12 +114,12 @@
                                 <div>
                                     {!! view_render_event('bagisto.shop.customers.account.wishlist.image.before') !!}
 
-                                    <a :href="`{{ route('shop.product_or_category.index', '') }}/${wishlist.product.url_key}`">
+                                    <a :href="'{{ route('shop.product_or_category.index', ':slug') }}'.replace(':slug', wishlist.product.url_key)">
                                         <!-- Wishlist Item Image -->
                                         <img
                                             class="h-28 max-h-28 w-28 max-w-28 rounded-xl max-md:h-20 max-md:max-h-20 max-md:w-20 max-md:max-w-20"
                                             :src="wishlist.product.base_image.small_image_url"
-                                            alt="Product Image"
+                                            :alt="wishlist.product.base_image.alt"
                                         />
                                     </a>
 
@@ -217,7 +217,9 @@
                                             name="quantity"
                                             ::value="wishlist.options.quantity ?? 1"
                                             class="flex max-h-10 items-center gap-x-2.5 rounded-[54px] border border-navyBlue px-3.5 py-1.5 max-md:gap-x-1 max-md:px-1.5 max-md:py-1"
+                                            :removable="true"
                                             @change="(qty) => wishlist.quantity = qty"
+                                            @remove="remove"
                                         />
 
                                         @if (core()->getConfigData('sales.checkout.shopping_cart.cart_page'))
@@ -319,7 +321,7 @@
                         this.$emitter.emit('open-confirm-modal', {
                             agree: () => {
                                 this.$axios
-                                    .delete(`{{ route('shop.api.customers.account.wishlist.destroy', '') }}/${this.wishlist.id}`)
+                                    .delete('{{ route('shop.api.customers.account.wishlist.destroy', ':id') }}'.replace(':id', this.wishlist.id))
                                     .then(response => {
                                         this.$emit('wishlist-items', response.data.data);
 

@@ -2,12 +2,15 @@
 
 namespace Webkul\Admin\DataGrids\Catalog;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Webkul\Admin\Exports\ProductDataGridExport;
 use Webkul\Attribute\Repositories\AttributeFamilyRepository;
 use Webkul\Core\Facades\ElasticSearch;
 use Webkul\DataGrid\DataGrid;
+use Webkul\Marketing\Repositories\SearchSynonymRepository;
 use Webkul\Product\Helpers\Product;
 
 class ProductDataGrid extends DataGrid
@@ -20,40 +23,26 @@ class ProductDataGrid extends DataGrid
     protected $primaryColumn = 'product_id';
 
     /**
-     * Constructor for the class.
+     * Create a new datagrid instance.
      *
      * @return void
      */
-    public function __construct(protected AttributeFamilyRepository $attributeFamilyRepository) {}
+    public function __construct(
+        protected AttributeFamilyRepository $attributeFamilyRepository,
+        protected SearchSynonymRepository $searchSynonymRepository
+    ) {}
 
     /**
      * Prepare query builder.
      *
-     * @return \Illuminate\Database\Query\Builder
+     * @return Builder
      */
     public function prepareQueryBuilder()
     {
-        $tablePrefix = DB::getTablePrefix();
-
-        /**
-         * Query Builder to fetch records from `product_flat` table
-         */
         $queryBuilder = DB::table('product_flat')
-            ->distinct()
-            ->leftJoin('attribute_families as af', 'product_flat.attribute_family_id', '=', 'af.id')
-            ->leftJoin('product_inventories', 'product_flat.product_id', '=', 'product_inventories.product_id')
-            ->leftJoin('product_images', 'product_flat.product_id', '=', 'product_images.product_id')
-            ->leftJoin('product_categories as pc', 'product_flat.product_id', '=', 'pc.product_id')
-            ->leftJoin('category_translations as ct', function ($leftJoin) {
-                $leftJoin->on('pc.category_id', '=', 'ct.category_id')
-                    ->where('ct.locale', app()->getLocale());
-            })
             ->select(
                 'product_flat.locale',
                 'product_flat.channel',
-                'product_images.path as base_image',
-                'pc.category_id',
-                'ct.name as category_name',
                 'product_flat.product_id',
                 'product_flat.sku',
                 'product_flat.name',
@@ -62,20 +51,17 @@ class ProductDataGrid extends DataGrid
                 'product_flat.price',
                 'product_flat.url_key',
                 'product_flat.visible_individually',
-                'af.name as attribute_family',
+                'product_flat.quantity',
+                'product_flat.images_count',
+                'product_flat.base_image',
+                'product_flat.manage_stock',
+                'product_flat.category_name',
+                'product_flat.attribute_family_name as attribute_family',
             )
-            ->addSelect(DB::raw('SUM(DISTINCT '.$tablePrefix.'product_inventories.qty) as quantity'))
-            ->addSelect(DB::raw('COUNT(DISTINCT '.$tablePrefix.'product_images.id) as images_count'))
             ->where('product_flat.locale', app()->getLocale())
             ->groupBy('product_flat.product_id');
 
-        $this->addFilter('product_id', 'product_flat.product_id');
-        $this->addFilter('channel', 'product_flat.channel');
-        $this->addFilter('locale', 'product_flat.locale');
-        $this->addFilter('name', 'product_flat.name');
-        $this->addFilter('type', 'product_flat.type');
-        $this->addFilter('status', 'product_flat.status');
-        $this->addFilter('attribute_family', 'af.id');
+        $this->addFilter('attribute_family', 'attribute_family_id');
 
         return $queryBuilder;
     }
@@ -91,52 +77,52 @@ class ProductDataGrid extends DataGrid
 
         if ($channels->count() > 1) {
             $this->addColumn([
-                'index'              => 'channel',
-                'label'              => trans('admin::app.catalog.products.index.datagrid.channel'),
-                'type'               => 'string',
-                'filterable'         => true,
-                'filterable_type'    => 'dropdown',
+                'index' => 'channel',
+                'label' => trans('admin::app.catalog.products.index.datagrid.channel'),
+                'type' => 'string',
+                'filterable' => true,
+                'filterable_type' => 'dropdown',
                 'filterable_options' => collect($channels)
                     ->map(fn ($channel) => ['label' => $channel->name, 'value' => $channel->code])
                     ->values()
                     ->toArray(),
-                'sortable'   => true,
+                'sortable' => true,
                 'visibility' => false,
             ]);
         }
 
         $this->addColumn([
-            'index'      => 'name',
-            'label'      => trans('admin::app.catalog.products.index.datagrid.name'),
-            'type'       => 'string',
+            'index' => 'name',
+            'label' => trans('admin::app.catalog.products.index.datagrid.name'),
+            'type' => 'string',
             'searchable' => true,
             'filterable' => true,
-            'sortable'   => true,
+            'sortable' => true,
         ]);
 
         $this->addColumn([
-            'index'      => 'sku',
-            'label'      => trans('admin::app.catalog.products.index.datagrid.sku'),
-            'type'       => 'string',
+            'index' => 'sku',
+            'label' => trans('admin::app.catalog.products.index.datagrid.sku'),
+            'type' => 'string',
             'filterable' => true,
-            'sortable'   => true,
+            'sortable' => true,
         ]);
 
         $this->addColumn([
-            'index'              => 'attribute_family',
-            'label'              => trans('admin::app.catalog.products.index.datagrid.attribute-family'),
-            'type'               => 'string',
-            'filterable'         => true,
-            'filterable_type'    => 'dropdown',
+            'index' => 'attribute_family',
+            'label' => trans('admin::app.catalog.products.index.datagrid.attribute-family'),
+            'type' => 'string',
+            'filterable' => true,
+            'filterable_type' => 'dropdown',
             'filterable_options' => $this->attributeFamilyRepository->all(['name as label', 'id as value'])->toArray(),
         ]);
 
         $this->addColumn([
-            'index'      => 'base_image',
-            'label'      => trans('admin::app.catalog.products.index.datagrid.image'),
-            'type'       => 'string',
+            'index' => 'base_image',
+            'label' => trans('admin::app.catalog.products.index.datagrid.image'),
+            'type' => 'string',
             'exportable' => false,
-            'closure'    => function ($row) {
+            'closure' => function ($row) {
                 if (! $row->base_image) {
                     return;
                 }
@@ -146,33 +132,33 @@ class ProductDataGrid extends DataGrid
         ]);
 
         $this->addColumn([
-            'index'      => 'price',
-            'label'      => trans('admin::app.catalog.products.index.datagrid.price'),
-            'type'       => 'decimal',
+            'index' => 'price',
+            'label' => trans('admin::app.catalog.products.index.datagrid.price'),
+            'type' => 'decimal',
             'filterable' => true,
-            'sortable'   => true,
+            'sortable' => true,
         ]);
 
         $this->addColumn([
-            'index'      => 'quantity',
-            'label'      => trans('admin::app.catalog.products.index.datagrid.qty'),
-            'type'       => 'integer',
-            'sortable'   => true,
+            'index' => 'quantity',
+            'label' => trans('admin::app.catalog.products.index.datagrid.qty'),
+            'type' => 'integer',
+            'sortable' => true,
         ]);
 
         $this->addColumn([
-            'index'      => 'product_id',
-            'label'      => trans('admin::app.catalog.products.index.datagrid.id'),
-            'type'       => 'integer',
+            'index' => 'product_id',
+            'label' => trans('admin::app.catalog.products.index.datagrid.id'),
+            'type' => 'integer',
             'filterable' => true,
-            'sortable'   => true,
+            'sortable' => true,
         ]);
 
         $this->addColumn([
-            'index'              => 'status',
-            'label'              => trans('admin::app.catalog.products.index.datagrid.status'),
-            'type'               => 'boolean',
-            'filterable'         => true,
+            'index' => 'status',
+            'label' => trans('admin::app.catalog.products.index.datagrid.status'),
+            'type' => 'boolean',
+            'filterable' => true,
             'filterable_options' => [
                 [
                     'label' => trans('admin::app.catalog.products.index.datagrid.active'),
@@ -183,26 +169,26 @@ class ProductDataGrid extends DataGrid
                     'value' => 0,
                 ],
             ],
-            'sortable'   => true,
+            'sortable' => true,
         ]);
 
         $this->addColumn([
-            'index'      => 'category_name',
-            'label'      => trans('admin::app.catalog.products.index.datagrid.category'),
-            'type'       => 'string',
+            'index' => 'category_name',
+            'label' => trans('admin::app.catalog.products.index.datagrid.category'),
+            'type' => 'string',
         ]);
 
         $this->addColumn([
-            'index'              => 'type',
-            'label'              => trans('admin::app.catalog.products.index.datagrid.type'),
-            'type'               => 'string',
-            'filterable'         => true,
-            'filterable_type'    => 'dropdown',
+            'index' => 'type',
+            'label' => trans('admin::app.catalog.products.index.datagrid.type'),
+            'type' => 'string',
+            'filterable' => true,
+            'filterable_type' => 'dropdown',
             'filterable_options' => collect(config('product_types'))
                 ->map(fn ($type) => ['label' => trans($type['name']), 'value' => $type['key']])
                 ->values()
                 ->toArray(),
-            'sortable'   => true,
+            'sortable' => true,
         ]);
     }
 
@@ -215,10 +201,10 @@ class ProductDataGrid extends DataGrid
     {
         if (bouncer()->hasPermission('catalog.products.copy')) {
             $this->addAction([
-                'icon'   => 'icon-copy',
-                'title'  => trans('admin::app.catalog.products.index.datagrid.copy'),
+                'icon' => 'icon-copy',
+                'title' => trans('admin::app.catalog.products.index.datagrid.copy'),
                 'method' => 'POST',
-                'url'    => function ($row) {
+                'url' => function ($row) {
                     return route('admin.catalog.products.copy', $row->product_id);
                 },
             ]);
@@ -226,14 +212,14 @@ class ProductDataGrid extends DataGrid
 
         if (bouncer()->hasPermission('catalog.products.edit')) {
             $this->addAction([
-                'icon'   => 'icon-sort-right',
-                'title'  => trans('admin::app.catalog.products.index.datagrid.edit'),
+                'icon' => 'icon-sort-right',
+                'title' => trans('admin::app.catalog.products.index.datagrid.edit'),
                 'method' => 'GET',
-                'url'    => function ($row) {
+                'url' => function ($row) {
                     $filteredChannel = request()->input('filters.channel')[0] ?? null;
 
                     return route('admin.catalog.products.edit', [
-                        'id'      => $row->product_id,
+                        'id' => $row->product_id,
                         'channel' => $filteredChannel,
                     ]);
                 },
@@ -250,17 +236,17 @@ class ProductDataGrid extends DataGrid
     {
         if (bouncer()->hasPermission('catalog.products.delete')) {
             $this->addMassAction([
-                'title'  => trans('admin::app.catalog.products.index.datagrid.delete'),
-                'url'    => route('admin.catalog.products.mass_delete'),
+                'title' => trans('admin::app.catalog.products.index.datagrid.delete'),
+                'url' => route('admin.catalog.products.mass_delete'),
                 'method' => 'POST',
             ]);
         }
 
         if (bouncer()->hasPermission('catalog.products.edit')) {
             $this->addMassAction([
-                'title'   => trans('admin::app.catalog.products.index.datagrid.update-status'),
-                'url'     => route('admin.catalog.products.mass_update'),
-                'method'  => 'POST',
+                'title' => trans('admin::app.catalog.products.index.datagrid.update-status'),
+                'url' => route('admin.catalog.products.mass_update'),
+                'method' => 'POST',
                 'options' => [
                     [
                         'label' => trans('admin::app.catalog.products.index.datagrid.active'),
@@ -276,7 +262,64 @@ class ProductDataGrid extends DataGrid
     }
 
     /**
-     * Process request.
+     * Return a custom exporter that includes all product attribute values.
+     */
+    public function getExporter(): ProductDataGridExport
+    {
+        return new ProductDataGridExport($this);
+    }
+
+    /**
+     * Return the Elasticsearch clause matching one requested filter.
+     */
+    public function getFilterValue(mixed $attribute, mixed $values): array
+    {
+        switch ($attribute) {
+            case 'product_id':
+                return [
+                    'terms' => [
+                        'id' => $values,
+                    ],
+                ];
+
+            case 'attribute_family':
+                return [
+                    'terms' => [
+                        'attribute_family_id' => $values,
+                    ],
+                ];
+
+            case 'sku':
+            case 'name':
+                $filters = [];
+
+                foreach ($values as $value) {
+                    $terms = $attribute === 'name'
+                        ? $this->searchSynonymRepository->getSynonymsByQuery($value)
+                        : [$value];
+
+                    foreach ($terms as $term) {
+                        $filters['bool']['should'][] = [
+                            'match_phrase_prefix' => [
+                                $attribute => $term,
+                            ],
+                        ];
+                    }
+                }
+
+                return $filters;
+
+            default:
+                return [
+                    'terms' => [
+                        $attribute => $values,
+                    ],
+                ];
+        }
+    }
+
+    /**
+     * Process the request through Elasticsearch when the admin grid is set to search with it.
      */
     protected function processRequest(): void
     {
@@ -310,16 +353,17 @@ class ProductDataGrid extends DataGrid
             return Product::formatElasticSearchIndexName($channelCode, app()->getLocale());
         })->toArray();
 
-        $results = Elasticsearch::search([
+        $results = ElasticSearch::search([
             'index' => $indexNames,
-            'body'  => [
-                'from'             => ($pagination['page'] * $pagination['per_page']) - $pagination['per_page'],
-                'size'             => $pagination['per_page'],
-                'stored_fields'    => [],
-                'query'            => [
+            'ignore_unavailable' => true,
+            'body' => [
+                'from' => ($pagination['page'] * $pagination['per_page']) - $pagination['per_page'],
+                'size' => $pagination['per_page'],
+                'stored_fields' => [],
+                'query' => [
                     'bool' => $this->getElasticFilters($params['filters'] ?? []) ?: new \stdClass,
                 ],
-                'sort'             => $this->getElasticSort($params['sort'] ?? []),
+                'sort' => $this->getElasticSort($params['sort'] ?? []),
                 'track_total_hits' => true,
             ],
         ]);
@@ -342,7 +386,7 @@ class ProductDataGrid extends DataGrid
             $pagination['per_page'],
             $pagination['page'],
             [
-                'path'  => request()->url(),
+                'path' => request()->url(),
                 'query' => [],
             ]
         );
@@ -351,7 +395,7 @@ class ProductDataGrid extends DataGrid
     }
 
     /**
-     * Process request.
+     * Return the Elasticsearch filters for every requested datagrid filter.
      */
     protected function getElasticFilters($params): array
     {
@@ -373,60 +417,16 @@ class ProductDataGrid extends DataGrid
     }
 
     /**
-     * Return applied filters
-     */
-    public function getFilterValue(mixed $attribute, mixed $values): array
-    {
-        switch ($attribute) {
-            case 'product_id':
-                return [
-                    'terms' => [
-                        'id' => $values,
-                    ],
-                ];
-
-            case 'attribute_family':
-                return [
-                    'terms' => [
-                        'attribute_family_id' => $values,
-                    ],
-                ];
-
-            case 'sku':
-            case 'name':
-                $filters = [];
-
-                foreach ($values as $value) {
-                    $filters['bool']['should'][] = [
-                        'match_phrase_prefix' => [
-                            $attribute => $value,
-                        ],
-                    ];
-                }
-
-                return $filters;
-
-            default:
-                return [
-                    'terms' => [
-                        $attribute => $values,
-                    ],
-                ];
-        }
-    }
-
-    /**
-     * Process request.
+     * Return the Elasticsearch sort for the requested column.
+     *
+     * Analyzed text is sorted on the untouched copy beside it, and a column the index has never
+     * held leaves the results unordered rather than failing the request.
      */
     protected function getElasticSort($params): array
     {
         $sort = $params['column'] ?? $this->primaryColumn;
 
-        if ($sort == 'type') {
-            $sort .= '.keyword';
-        }
-
-        if ($sort == 'name') {
+        if (in_array($sort, ['name', 'sku', 'type'])) {
             $sort .= '.keyword';
         }
 
@@ -441,6 +441,7 @@ class ProductDataGrid extends DataGrid
         return [
             $sort => [
                 'order' => $params['order'] ?? $this->sortOrder,
+                'unmapped_type' => 'keyword',
             ],
         ];
     }

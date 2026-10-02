@@ -92,8 +92,8 @@ it('should returns the search page of the products', function () {
     // Arrange.
     $product = (new ProductFaker([
         'attributes' => [
-            5  => 'new',
-            6  => 'featured',
+            5 => 'new',
+            6 => 'featured',
             11 => 'price',
             26 => 'guest_checkout',
         ],
@@ -122,6 +122,21 @@ it('should returns the search page of the products', function () {
         ->assertSeeText(trans('shop::app.search.title', ['query' => $query]));
 });
 
+it('rejects an array search query instead of running it as a raw sql condition', function () {
+    // Arrange.
+    config(['responsecache.enabled' => true]);
+
+    // Act.
+    $response = get('/search?'.http_build_query([
+        'query' => ['a', 'RAW', '1=0 UNION SELECT 1'],
+    ]));
+
+    // Assert.
+    $response->assertRedirect();
+
+    expect($response->baseResponse->getStatusCode())->not->toBe(500);
+});
+
 it('should fails the validation error when provided wrong email address when subscribe to the shop', function () {
     // Act and Assert.
     postJson(route('shop.subscription.store'))
@@ -139,7 +154,7 @@ it('should store the subscription of the shop', function () {
     $this->assertModelWise([
         SubscribersList::class => [
             [
-                'email'         => $email,
+                'email' => $email,
                 'is_subscribed' => 1,
             ],
         ],
@@ -158,7 +173,7 @@ it('should store the subscription of the shop and send the mail to the admin', f
     $this->assertModelWise([
         SubscribersList::class => [
             [
-                'email'         => $email,
+                'email' => $email,
                 'is_subscribed' => 1,
             ],
         ],
@@ -188,8 +203,8 @@ it('should store the products to the compare list', function () {
     // Arrange.
     $product = (new ProductFaker([
         'attributes' => [
-            5  => 'new',
-            6  => 'featured',
+            5 => 'new',
+            6 => 'featured',
             11 => 'price',
             26 => 'guest_checkout',
         ],
@@ -232,8 +247,8 @@ it('should remove product from compare list', function () {
     // Arrange.
     $product = (new ProductFaker([
         'attributes' => [
-            5  => 'new',
-            6  => 'featured',
+            5 => 'new',
+            6 => 'featured',
             11 => 'price',
             26 => 'guest_checkout',
         ],
@@ -257,8 +272,8 @@ it('should remove product from compare list', function () {
     $this->loginAsCustomer();
 
     CompareItem::factory()->create([
-        'customer_id'  => auth()->guard('customer')->user()->id,
-        'product_id'   => $product->id,
+        'customer_id' => auth()->guard('customer')->user()->id,
+        'product_id' => $product->id,
     ]);
 
     deleteJson(route('shop.api.compare.destroy'), [
@@ -272,8 +287,8 @@ it('should remove all the products from compare list', function () {
     // Arrange.
     $products = (new ProductFaker([
         'attributes' => [
-            5  => 'new',
-            6  => 'featured',
+            5 => 'new',
+            6 => 'featured',
             11 => 'price',
             26 => 'guest_checkout',
         ],
@@ -298,8 +313,8 @@ it('should remove all the products from compare list', function () {
 
     foreach ($products as $product) {
         CompareItem::factory()->create([
-            'customer_id'  => auth()->guard('customer')->user()->id,
-            'product_id'   => $product->id,
+            'customer_id' => auth()->guard('customer')->user()->id,
+            'product_id' => $product->id,
         ]);
     }
 

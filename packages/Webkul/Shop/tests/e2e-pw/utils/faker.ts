@@ -155,6 +155,28 @@ export function generatePhoneNumber() {
 
     return `${phoneNumber}`;
 }
+export function generateLocation() {
+    const location = [
+        "New York",
+        "Los Angeles",
+        "Chicago",
+        "Houston",
+        "Phoenix",
+        "Philadelphia",
+        "San Antonio",
+        "San Diego",
+        "Dallas",
+        "San Jose",
+        "Austin",
+        "Jacksonville",
+        "San Francisco",
+        "Indianapolis",
+        "Columbus",
+        "Fort Worth",
+    ];
+
+    return location[Math.floor(Math.random() * location.length)];
+}
 
 export function generateSKU() {
     const letters = Array.from({ length: 3 }, () =>
@@ -184,7 +206,7 @@ export function generateSlug(delimiter = "-") {
     return slug;
 }
 
-export function generateDescription(length = 255) {
+export function generateDescription(length = 200) {
     const phrases = [
         "An innovative and sleek design.",
         "Built for speed and efficiency.",

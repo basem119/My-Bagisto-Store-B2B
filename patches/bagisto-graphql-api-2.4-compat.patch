@@ -1,0 +1,91 @@
+diff --git src/graphql/admin/setting/theme.graphql src/graphql/admin/setting/theme.graphql
+index c95a65b..7712185 100644
+--- src/graphql/admin/setting/theme.graphql
++++ src/graphql/admin/setting/theme.graphql
+@@ -1,15 +1,16 @@
+ # Setting\Theme Related APIs
+ extend type Query @guard(with: ["admin-api"]){
++    # Bagisto 2.4.x compatibility: ThemeCustomization was renamed to Section.
+     themes(
+         input: FilterThemesInput
+         @builder(method: "Webkul\\GraphQLAPI\\Queries\\Admin\\Setting\\FilterTheme")
+     ): [Theme!] @paginate(
+         type: "PAGINATOR"
+         defaultCount: 10
+-        model: "Webkul\\Theme\\Models\\ThemeCustomization"
++        model: "Webkul\\Theme\\Models\\Section"
+     )
+ 
+-    theme(id: ID @eq): Theme @find(model: "Webkul\\Theme\\Models\\ThemeCustomization")
++    theme(id: ID @eq): Theme @find(model: "Webkul\\Theme\\Models\\Section")
+ }
+ 
+ extend type Mutation @guard(with: ["admin-api"]) {
+@@ -86,7 +87,8 @@ type Theme {
+ 
+ type ThemeTranslation {
+     id: ID!
+-    themeCustomizationId: Int! @rename(attribute: "theme_customization_id")
++    # Bagisto 2.4.x compatibility: column renamed theme_customization_id -> section_id.
++    themeCustomizationId: Int! @rename(attribute: "section_id")
+     localeCode: String! @rename(attribute: "locale")
+     options: Options!
+ }
+diff --git src/Mutations/Admin/Setting/ThemeMutation.php src/Mutations/Admin/Setting/ThemeMutation.php
+index 6b22976..e1723f9 100644
+--- src/Mutations/Admin/Setting/ThemeMutation.php
++++ src/Mutations/Admin/Setting/ThemeMutation.php
+@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\Storage;
+ use Nuwave\Lighthouse\Support\Contracts\GraphQLContext;
+ use Webkul\Core\Repositories\ChannelRepository;
+ use Webkul\GraphQLAPI\Validators\CustomException;
+-use Webkul\Theme\Repositories\ThemeCustomizationRepository;
++// Bagisto 2.4.x compatibility: ThemeCustomizationRepository was renamed to SectionRepository.
++use Webkul\Theme\Repositories\SectionRepository;
+ 
+ class ThemeMutation extends Controller
+ {
+@@ -18,7 +19,7 @@ class ThemeMutation extends Controller
+      * @return void
+      */
+     public function __construct(
+-        protected ThemeCustomizationRepository $themeCustomizationRepository,
++        protected SectionRepository $themeCustomizationRepository,
+         protected ChannelRepository $channelRepository
+     ) {}
+ 
+diff --git src/Queries/Shop/Common/HomePageQuery.php src/Queries/Shop/Common/HomePageQuery.php
+index 72941e5..29528a9 100644
+--- src/Queries/Shop/Common/HomePageQuery.php
++++ src/Queries/Shop/Common/HomePageQuery.php
+@@ -15,7 +15,8 @@ use Webkul\Attribute\Repositories\AttributeRepository;
+ use Nuwave\Lighthouse\Support\Contracts\GraphQLContext;
+ use Webkul\Product\Repositories\ElasticSearchRepository;
+ use Webkul\Marketing\Repositories\SearchSynonymRepository;
+-use Webkul\Theme\Repositories\ThemeCustomizationRepository;
++// Bagisto 2.4.x compatibility: ThemeCustomizationRepository was renamed to SectionRepository.
++use Webkul\Theme\Repositories\SectionRepository;
+ use Webkul\BookingProduct\Repositories\BookingProductRepository;
+ use Webkul\BookingProduct\Helpers\AppointmentSlot as AppointmentSlotHelper;
+ use Webkul\BookingProduct\Helpers\DefaultSlot as DefaultSlotHelper;
+@@ -44,7 +45,7 @@ class HomePageQuery extends BaseFilter
+         protected CategoryRepository $categoryRepository,
+         protected CustomerRepository $customerRepository,
+         protected SearchSynonymRepository $searchSynonymRepository,
+-        protected ThemeCustomizationRepository $themeCustomizationRepository,
++        protected SectionRepository $themeCustomizationRepository,
+         protected Toolbar $productHelperToolbar,
+         protected PageRepository $PageRepository,
+         protected BookingProductRepository $bookingProductRepository,
+@@ -80,7 +81,10 @@ class HomePageQuery extends BaseFilter
+      */
+     public function getThemeCustomizationData()
+     {
+-        visitor()->visit();
++        // Bagisto 2.4.x compatibility: shetabit/visitor (and the visitor() helper) was removed
++        // from Bagisto core; this was a page-visit analytics side effect only and does not
++        // affect the data returned below, so it is dropped rather than reintroducing the
++        // removed dependency.
+ 
+         $customizations = $this->themeCustomizationRepository
+             ->with(['translations' => function ($query) {

@@ -65,7 +65,6 @@
                             :label="trans('admin::app.cms.create.content')"
                             :placeholder="trans('admin::app.cms.create.content')"
                             :tinymce="true"
-                            :prompt="core()->getConfigData('general.magic_ai.content_generation.cms_page_content_prompt')"
                         />
 
                         <x-admin::form.control-group.error control-name="html_content" />
@@ -83,7 +82,12 @@
                     </p>
 
                     <!-- SEO Title & Description Blade Component -->
-                    <x-admin::seo/>
+                    <x-admin::seo
+                        slug="page"
+                        meta-title-field="meta_title"
+                        url-key-field="url_key"
+                        meta-description-field="meta_description"
+                    />
 
                     <!-- Meta Title -->
                     <x-admin::form.control-group>
@@ -196,7 +200,7 @@
                         </x-admin::form.control-group>
 
                         <!-- Select Channels -->
-                        <x-admin::form.control-group.label>
+                        <x-admin::form.control-group.label class="required">
                             @lang('admin::app.cms.create.channels')
                         </x-admin::form.control-group.label>
 
@@ -206,6 +210,7 @@
                                     type="checkbox"
                                     :id="'channels_' . $channel->id"
                                     name="channels[]"
+                                    rules="required"
                                     :value="$channel->id"
                                     :for="'channels_' . $channel->id"
                                     :label="trans('admin::app.cms.create.channels')"
@@ -213,7 +218,8 @@
 
                                 <label
                                     class="cursor-pointer text-xs font-medium text-gray-600 dark:text-gray-300"
-                                    for="channels_{{ $channel->id }}" 
+                                    for="channels_{{ $channel->id }}"
+                                    v-pre
                                 >
                                     {{ core()->getChannelName($channel) }}
                                 </label>

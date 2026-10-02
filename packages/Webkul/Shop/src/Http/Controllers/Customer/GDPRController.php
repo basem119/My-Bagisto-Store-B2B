@@ -3,6 +3,7 @@
 namespace Webkul\Shop\Http\Controllers\Customer;
 
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Event;
 use Webkul\Customer\Repositories\CustomerAddressRepository;
 use Webkul\GDPR\Repositories\GDPRDataRequestRepository;
@@ -51,13 +52,16 @@ class GDPRController extends Controller
     {
         $customer = auth()->guard('customer')->user();
 
-        $params = request()->all() + [
-            'status'        => 'pending',
-            'customer_id'   => $customer->id,
-            'customer_name' => $customer->first_name.' '.$customer->last_name,
-            'email'         => $customer->email,
-            'message'       => request()->get(request()->message),
-        ];
+        $data = $this->validate(request(), [
+            'type' => 'required|in:update,delete',
+            'message' => 'required|string|max:500',
+        ]);
+
+        $params = array_merge($data, [
+            'status' => 'pending',
+            'customer_id' => $customer->id,
+            'email' => $customer->email,
+        ]);
 
         Event::dispatch('customer.account.gdpr-request.create.before');
 
@@ -68,6 +72,12 @@ class GDPRController extends Controller
         Event::dispatch('customer.gdpr-request.create.after', $gdprRequest);
 
         session()->flash('success', trans('shop::app.customers.account.gdpr.create-success'));
+
+        if (request()->ajax()) {
+            return new JsonResponse([
+                'message' => trans('shop::app.customers.account.gdpr.create-success'),
+            ]);
+        }
 
         return redirect()->route('shop.customers.account.gdpr.index');
     }
@@ -86,8 +96,8 @@ class GDPRController extends Controller
 
             $param = [
                 'customerInformation' => $customer,
-                'order'               => ! empty($orders) ? $orders : null,
-                'address'             => ! empty($address) ? $address : null,
+                'order' => ! empty($orders) ? $orders : null,
+                'address' => ! empty($address) ? $address : null,
             ];
 
             if (is_null($param['order'])) {
@@ -122,8 +132,8 @@ class GDPRController extends Controller
 
             $param = [
                 'customerInformation' => $customer,
-                'order'               => ! empty($orders) ? $orders : null,
-                'address'             => ! empty($address) ? $address : null,
+                'order' => ! empty($orders) ? $orders : null,
+                'address' => ! empty($address) ? $address : null,
             ];
 
             if (is_null($param['order'])) {
@@ -135,7 +145,7 @@ class GDPRController extends Controller
             }
 
         } catch (\Exception $e) {
-            $param = ['customerInformation'=>$customer];
+            $param = ['customerInformation' => $customer];
         }
 
         return view('shop::customers.account.gdpr.pdf', compact('param'));
@@ -157,9 +167,9 @@ class GDPRController extends Controller
         $customer = auth()->guard('customer')->user();
 
         $data = $this->gdprDataRequestRepository->findWhere([
-            'id'          => $id,
+            'id' => $id,
             'customer_id' => $customer->id,
-            'status'      => 'pending',
+            'status' => 'pending',
         ])->first();
 
         if (! $data) {
@@ -171,7 +181,7 @@ class GDPRController extends Controller
         Event::dispatch('customer.account.gdpr-request.update.before');
 
         $gdprRequest = $this->gdprDataRequestRepository->update([
-            'status'     => 'revoked',
+            'status' => 'revoked',
             'revoked_at' => Carbon::now(),
         ], $id);
 

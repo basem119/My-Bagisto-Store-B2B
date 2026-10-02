@@ -1,21 +1,21 @@
 {
-  "_veeValidate-7iwkjF5e.js": {
-    "file": "assets/veeValidate-7iwkjF5e.js",
+  "_veeValidate-o7oVFGhs.js": {
+    "file": "assets/veeValidate-o7oVFGhs.js",
     "name": "veeValidate",
     "imports": [
-      "_vue-yrsH8LFT.js"
+      "_vue-Cbfb4A7j.js"
     ]
   },
-  "_vendor-DToXbgQU.js": {
-    "file": "assets/vendor-DToXbgQU.js",
+  "_vendor-DdbqHu3R.js": {
+    "file": "assets/vendor-DdbqHu3R.js",
     "name": "vendor"
   },
-  "_vue-yrsH8LFT.js": {
-    "file": "assets/vue-yrsH8LFT.js",
+  "_vue-Cbfb4A7j.js": {
+    "file": "assets/vue-Cbfb4A7j.js",
     "name": "vue"
   },
   "src/Resources/assets/css/app.css": {
-    "file": "assets/app-Bzp8Mt9S.css",
+    "file": "assets/app-CiQ_lq5i.css",
     "src": "src/Resources/assets/css/app.css",
     "isEntry": true
   },
@@ -67,9 +67,25 @@
     "file": "assets/no-address-BHTy4apn.png",
     "src": "src/Resources/assets/images/no-address.png"
   },
+  "src/Resources/assets/images/payglocal.png": {
+    "file": "assets/payglocal-CSDEoMi_.png",
+    "src": "src/Resources/assets/images/payglocal.png"
+  },
   "src/Resources/assets/images/paypal.png": {
     "file": "assets/paypal-CIu1GKlz.png",
     "src": "src/Resources/assets/images/paypal.png"
+  },
+  "src/Resources/assets/images/payu.png": {
+    "file": "assets/payu-Lrh50Ekl.png",
+    "src": "src/Resources/assets/images/payu.png"
+  },
+  "src/Resources/assets/images/phonepe.png": {
+    "file": "assets/phonepe-0x8o_RaK.png",
+    "src": "src/Resources/assets/images/phonepe.png"
+  },
+  "src/Resources/assets/images/razorpay.png": {
+    "file": "assets/razorpay-Cbr80qFP.png",
+    "src": "src/Resources/assets/images/razorpay.png"
   },
   "src/Resources/assets/images/review.png": {
     "file": "assets/review-ZWqERyaT.png",
@@ -82,6 +98,10 @@
   "src/Resources/assets/images/spinner.svg": {
     "file": "assets/spinner-CWS6ej98.svg",
     "src": "src/Resources/assets/images/spinner.svg"
+  },
+  "src/Resources/assets/images/stripe.png": {
+    "file": "assets/stripe-WsnmAxt1.png",
+    "src": "src/Resources/assets/images/stripe.png"
   },
   "src/Resources/assets/images/thank-you.png": {
     "file": "assets/thank-you-mhMpuEVL.png",
@@ -96,14 +116,14 @@
     "src": "src/Resources/assets/images/wishlist.png"
   },
   "src/Resources/assets/js/app.js": {
-    "file": "assets/app-BBORkkFO.js",
+    "file": "assets/app-Bk-rJHIJ.js",
     "name": "app",
     "src": "src/Resources/assets/js/app.js",
     "isEntry": true,
     "imports": [
-      "_vue-yrsH8LFT.js",
-      "_vendor-DToXbgQU.js",
-      "_veeValidate-7iwkjF5e.js"
+      "_vue-Cbfb4A7j.js",
+      "_vendor-DdbqHu3R.js",
+      "_veeValidate-o7oVFGhs.js"
     ],
     "css": [
       "assets/app-DsP8OK1c.css"

@@ -73,7 +73,7 @@
             @endif
 
             @if (
-                $order->canCancel()
+                $order->canCancel(force: true)
                 && bouncer()->hasPermission('sales.orders.cancel')
             )
                <form
@@ -109,6 +109,28 @@
             {!! view_render_event('bagisto.admin.sales.order.page_action.after', ['order' => $order]) !!}
         </div>
 
+        @php
+            $hasCustomerRestrictedItem = $order->items->contains(
+                fn ($item) => ! $item->isCancelableByCustomer()
+            );
+        @endphp
+
+        @if ($hasCustomerRestrictedItem)
+            <div class="mt-4 flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
+                <span class="icon-warning mt-0.5 text-lg"></span>
+
+                <div>
+                    <p class="font-semibold">
+                        @lang('admin::app.sales.orders.view.booking-cancellation-not-allowed.title')
+                    </p>
+
+                    <p class="text-xs">
+                        @lang('admin::app.sales.orders.view.booking-cancellation-not-allowed.description')
+                    </p>
+                </div>
+            </div>
+        @endif
+
         <!-- Order details -->
         <div class="mt-3.5 flex gap-2.5 max-xl:flex-wrap">
             <!-- Left Component -->
@@ -128,8 +150,10 @@
 
                     <!-- Order items -->
                     <div class="grid">
+                        {!! view_render_event('bagisto.admin.sales.order.list.before', ['order' => $order]) !!}
+
                         @foreach ($order->items as $item)
-                            {!! view_render_event('bagisto.admin.sales.order.list.before', ['order' => $order]) !!}
+                            {!! view_render_event('bagisto.admin.sales.order.list.item.before', ['order' => $order, 'item' => $item]) !!}
 
                             <div class="flex justify-between gap-2.5 border-b border-slate-300 px-4 py-6 dark:border-gray-800">
                                 <div class="flex gap-2.5">
@@ -149,7 +173,10 @@
                                     @endif
 
                                     <div class="grid place-content-start gap-1.5">
-                                        <p class="break-all text-base font-semibold text-gray-800 dark:text-white">
+                                        <p
+                                            class="break-all text-base font-semibold text-gray-800 dark:text-white"
+                                            v-pre
+                                        >
                                             {{ $item->name }}
                                         </p>
 
@@ -163,7 +190,10 @@
 
                                             @if (isset($item->additional['attributes']))
                                                 @foreach ($item->additional['attributes'] as $attribute)
-                                                    <p class="text-gray-600 dark:text-gray-300">
+                                                    <p
+                                                        class="text-gray-600 dark:text-gray-300"
+                                                        v-pre
+                                                    >
                                                         @if (
                                                             ! isset($attribute['attribute_type'])
                                                             || $attribute['attribute_type'] !== 'file'
@@ -185,7 +215,7 @@
                                             @endif
 
                                             <p class="text-gray-600 dark:text-gray-300">
-                                                @lang('admin::app.sales.orders.view.sku', ['sku' => $item->sku])
+                                                @lang('admin::app.sales.orders.view.sku', ['sku' => $item->getTypeInstance()->getOrderedItem($item)->sku ])
                                             </p>
 
                                             <p class="text-gray-600 dark:text-gray-300">
@@ -263,9 +293,10 @@
                                 </div>
                             </div>
 
-                            {!! view_render_event('bagisto.admin.sales.order.list.after', ['order' => $order]) !!}
-
+                            {!! view_render_event('bagisto.admin.sales.order.list.item.after', ['order' => $order, 'item' => $item]) !!}
                         @endforeach
+
+                        {!! view_render_event('bagisto.admin.sales.order.list.after', ['order' => $order]) !!}
                     </div>
 
                     <div class="mt-4 flex flex-auto justify-end p-4">
@@ -532,7 +563,10 @@
                     <!-- Comment List -->
                     @foreach ($order->comments()->orderBy('id', 'desc')->get() as $comment)
                         <div class="grid gap-1.5 p-4">
-                            <p class="break-all text-base leading-6 text-gray-800 dark:text-white">
+                            <p 
+                                class="break-all text-base leading-6 text-gray-800 dark:text-white"
+                                v-pre
+                            >
                                 {{ $comment->comment }}
                             </p>
 
@@ -569,22 +603,31 @@
                         </p>
                     </x-slot>
 
-                    <x-slot:content>
+                    <x-slot:content v-pre>
                         <div class="{{ $order->billing_address ? 'pb-4' : '' }}">
                             <div class="flex flex-col gap-1.5">
-                                <p class="font-semibold text-gray-800 dark:text-white">
+                                <p 
+                                    class="font-semibold text-gray-800 dark:text-white"
+                                    v-pre
+                                >
                                     {{ $order->customer_full_name }}
                                 </p>
 
                                 {!! view_render_event('bagisto.admin.sales.order.customer_full_name.after', ['order' => $order]) !!}
 
-                                <p class="text-gray-600 dark:text-gray-300">
+                                <p
+                                    class="text-gray-600 dark:text-gray-300"
+                                    v-pre
+                                >
                                     {{ $order->customer_email }}
                                 </p>
 
                                 {!! view_render_event('bagisto.admin.sales.order.customer_email.after', ['order' => $order]) !!}
 
-                                <p class="text-gray-600 dark:text-gray-300">
+                                <p 
+                                    class="text-gray-600 dark:text-gray-300"
+                                    v-pre
+                                >
                                     @lang('admin::app.sales.orders.view.customer-group') : {{ $order->is_guest ? core()->getGuestCustomerGroup()?->name : ($order->customer->group->name ?? '') }}
                                 </p>
 
@@ -699,7 +742,10 @@
                             </p>
 
                             <!-- Currency -->
-                            <p class="pt-4 font-semibold text-gray-800 dark:text-white">
+                            <p 
+                                class="pt-4 font-semibold text-gray-800 dark:text-white"
+                                v-pre
+                            >
                                 {{ $order->order_currency_code }}
                             </p>
 
@@ -711,11 +757,17 @@
 
                             <!-- Additional details -->
                             @if (! empty($additionalDetails))
-                                <p class="pt-4 font-semibold text-gray-800 dark:text-white">
+                                <p 
+                                    class="pt-4 font-semibold text-gray-800 dark:text-white"
+                                    v-pre
+                                >
                                     {{ $additionalDetails['title'] }}
                                 </p>
 
-                                <p class="text-gray-600 dark:text-gray-300">
+                                <p 
+                                    class="text-gray-600 dark:text-gray-300"
+                                    v-pre
+                                >
                                     {{ $additionalDetails['value'] }}
                                 </p>
                             @endif
@@ -728,7 +780,10 @@
                             <span class="mt-4 block w-full border-b dark:border-gray-800"></span>
 
                             <div class="pt-4">
-                                <p class="font-semibold text-gray-800 dark:text-white">
+                                <p 
+                                    class="font-semibold text-gray-800 dark:text-white"
+                                    v-pre
+                                >
                                     {{ $order->shipping_title }}
                                 </p>
 
@@ -863,7 +918,10 @@
                                         @lang('admin::app.sales.orders.view.name')
                                     </p>
 
-                                    <p class="text-gray-600 dark:text-gray-300">
+                                    <p 
+                                        class="text-gray-600 dark:text-gray-300"
+                                        v-pre
+                                    >
                                         {{ $refund->order->customer_full_name }}
                                     </p>
 

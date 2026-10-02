@@ -5,6 +5,7 @@ namespace Webkul\Product\Repositories;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Webkul\Core\Eloquent\Repository;
+use Webkul\Product\Models\Product;
 
 class ProductDownloadableLinkRepository extends Repository
 {
@@ -31,9 +32,9 @@ class ProductDownloadableLinkRepository extends Repository
             }
 
             return [
-                $type           => $path = request()->file($type)->store('product_downloadable_links/'.$productId, 'private'),
-                $type.'_name'   => $file->getClientOriginalName(),
-                $type.'_url'    => Storage::url($path),
+                $type => $path = request()->file($type)->store('product_downloadable_links/'.$productId, 'private'),
+                $type.'_name' => $file->getClientOriginalName(),
+                $type.'_url' => Storage::url($path),
             ];
         }
 
@@ -43,7 +44,7 @@ class ProductDownloadableLinkRepository extends Repository
     /**
      * Save links.
      *
-     * @param  \Webkul\Product\Models\Product  $product
+     * @param  Product  $product
      * @return void
      */
     public function saveLinks(array $data, $product)

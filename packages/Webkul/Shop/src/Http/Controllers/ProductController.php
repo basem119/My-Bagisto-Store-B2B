@@ -2,14 +2,18 @@
 
 namespace Webkul\Shop\Http\Controllers;
 
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Webkul\Product\Repositories\ProductAttributeValueRepository;
 use Webkul\Product\Repositories\ProductDownloadableLinkRepository;
 use Webkul\Product\Repositories\ProductDownloadableSampleRepository;
 use Webkul\Product\Repositories\ProductRepository;
+use Webkul\Shop\Traits\ValidatesExternalUrl;
 
 class ProductController extends Controller
 {
+    use ValidatesExternalUrl;
+
     /**
      * Create a new controller instance.
      *
@@ -27,12 +31,12 @@ class ProductController extends Controller
      *
      * @param  int  $productId
      * @param  int  $attributeId
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function download($productId, $attributeId)
     {
         $productAttribute = $this->productAttributeValueRepository->findOneWhere([
-            'product_id'   => $productId,
+            'product_id' => $productId,
             'attribute_id' => $attributeId,
         ]);
 
@@ -44,7 +48,7 @@ class ProductController extends Controller
     /**
      * Download the for the specified resource.
      *
-     * @return \Illuminate\Http\Response|\Exception
+     * @return Response|\Exception
      */
     public function downloadSample()
     {
@@ -62,6 +66,10 @@ class ProductController extends Controller
                     $fileName = substr($productDownloadableLink->sample_url, strrpos($productDownloadableLink->sample_url, '/') + 1);
 
                     $tempImage = tempnam(sys_get_temp_dir(), $fileName);
+
+                    if (! $this->validateExternalUrl($productDownloadableLink->sample_url)) {
+                        abort(404);
+                    }
 
                     copy($productDownloadableLink->sample_url, $tempImage);
 
@@ -82,6 +90,10 @@ class ProductController extends Controller
                     $fileName = substr($productDownloadableSample->url, strrpos($productDownloadableSample->url, '/') + 1);
 
                     $tempImage = tempnam(sys_get_temp_dir(), $fileName);
+
+                    if (! $this->validateExternalUrl($productDownloadableSample->url)) {
+                        abort(404);
+                    }
 
                     copy($productDownloadableSample->url, $tempImage);
 

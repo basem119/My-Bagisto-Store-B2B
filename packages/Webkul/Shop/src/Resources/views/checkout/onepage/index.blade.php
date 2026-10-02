@@ -20,7 +20,6 @@
     <!-- Page Header -->
     <div class="flex-wrap">
         <div class="flex w-full justify-between border border-b border-l-0 border-r-0 border-t-0 px-[60px] py-4 max-lg:px-8 max-sm:px-4">
-            <!-- Logo -->
             <div class="flex items-center gap-x-14 max-[1180px]:gap-x-9">
                 <a
                     href="{{ route('shop.home.index') }}"
@@ -29,20 +28,16 @@
                 >
                     <img
                         src="{{ core()->getCurrentChannel()->logo_url ?? bagisto_asset('images/logo.svg') }}"
-                        alt="{{ config('app.name') }}"
+                        alt="{{ core()->getCurrentChannel()->logo_alt ?: config('app.name') }}"
                         width="131"
                         height="29"
                     >
                 </a>
             </div>
 
-            <!-- Header Icons (login, cart, etc.) -->
-            <div class="flex items-center max-sm:items-end gap-x-4">
-                @guest('customer')
-                    @include('shop::checkout.login')
-                @endguest
-                <!-- Add other icons/components here if needed -->
-            </div>
+            @guest('customer')
+                @include('shop::checkout.login')
+            @endguest
         </div>
     </div>
 
@@ -114,7 +109,7 @@
                             class="flex justify-end"
                             v-if="canPlaceOrder"
                         >
-                            <template v-if="cart.payment_method == 'paypal_smart_button'">
+                            <template v-if="(selectedPaymentMethod || cart.payment_method) == 'paypal_smart_button'">
                                 {!! view_render_event('bagisto.shop.checkout.onepage.summary.paypal_smart_button.before') !!}
 
                                 <!-- Paypal Smart Button Vue Component -->
@@ -163,9 +158,9 @@
 
                         paymentMethods: null,
 
-                        canPlaceOrder: false,
+                        selectedPaymentMethod: null,
 
-                        initiateCheckoutTracked: false,
+                        canPlaceOrder: false,
                     }
                 },
 
@@ -180,8 +175,6 @@
                                 this.cart = response.data.data;
 
                                 this.scrollToCurrentStep();
-
-                                this.trackInitiateCheckout();
                             })
                             .catch(error => {});
                     },
@@ -202,33 +195,6 @@
                         } else if (this.currentStep == 'payment') {
                             this.paymentMethods = null;
                         }
-                    },
-
-                    trackInitiateCheckout() {
-                        if (
-                            this.initiateCheckoutTracked
-                            || ! this.cart
-                            || typeof window.fbqTrack !== 'function'
-                        ) {
-                            return;
-                        }
-
-                        const contents = (this.cart.items || []).map(item => ({
-                            id: item.product_url_key || item.id,
-                            quantity: item.quantity,
-                            item_price: item.price,
-                        }));
-
-                        window.fbqTrack('InitiateCheckout', {
-                            value: this.cart.grand_total,
-                            currency: '{{ core()->getCurrentCurrencyCode() }}',
-                            contents: contents,
-                            content_ids: contents.map(item => item.id),
-                            content_type: 'product',
-                            num_items: this.cart.items_qty ?? this.cart.items_count ?? contents.reduce((sum, item) => sum + (item.quantity || 0), 0),
-                        });
-
-                        this.initiateCheckoutTracked = true;
                     },
 
                     stepProcessed(data) {
@@ -254,7 +220,15 @@
                         });
                     },
 
+                    setSelectedPaymentMethod(method) {
+                        this.selectedPaymentMethod = method;
+                    },
+
                     placeOrder() {
+                        if ((this.selectedPaymentMethod || this.cart.payment_method) == 'paypal_smart_button') {
+                            return;
+                        }
+
                         this.isPlacingOrder = true;
 
                         this.$axios.post('{{ route('shop.checkout.onepage.orders.store') }}')

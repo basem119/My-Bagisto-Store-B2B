@@ -111,7 +111,10 @@
                                     @change="onSourceChange"
                                 >
                                     @foreach ($order->channel->inventory_sources as $inventorySource)
-                                        <option value="{{ $inventorySource->id }}">
+                                        <option 
+                                            value="{{ $inventorySource->id }}"
+                                            v-pre
+                                        >
                                             {{ $inventorySource->name }}
                                         </option>
                                     @endforeach
@@ -127,6 +130,10 @@
                                         $item->qty_to_ship > 0
                                         && $item->product
                                     )
+										@php
+											$canShipQty = app('\Webkul\RMA\Helpers\Helper')->getRemainingQtyAfterRMA($item->id);
+										@endphp
+
                                         <div class="flex justify-between gap-2.5 py-4">
                                             <div class="flex gap-2.5">
                                                 @if ($item->product?->base_image_url)
@@ -146,7 +153,10 @@
 
                                                 <div class="grid place-content-start gap-1.5">
                                                     <!-- Item Name -->
-                                                    <p class="text-base font-semibold text-gray-800 dark:text-white">
+                                                    <p 
+                                                        class="text-base font-semibold text-gray-800 dark:text-white"
+                                                        v-pre
+                                                    >
                                                         {{ $item->name }}
                                                     </p>
 
@@ -161,7 +171,10 @@
                                                         <!--Additional Attributes -->
                                                         @if (isset($item->additional['attributes']))
                                                             @foreach ($item->additional['attributes'] as $attribute)
-                                                                <p class="text-gray-600 dark:text-gray-300">
+                                                                <p 
+                                                                    class="text-gray-600 dark:text-gray-300"
+                                                                    v-pre
+                                                                >
                                                                     @if (
                                                                         ! isset($attribute['attribute_type'])
                                                                         || $attribute['attribute_type'] !== 'file'
@@ -209,7 +222,10 @@
                                             <div class="grid grid-cols-2 gap-2.5 border-b border-slate-300 py-2.5 dark:border-gray-800">
                                                 <div class="grid gap-1">
                                                     <!--Inventory Source -->
-                                                    <p class="text-base font-semibold text-gray-800 dark:text-white">
+                                                    <p
+                                                        class="text-base font-semibold text-gray-800 dark:text-white"
+                                                        v-pre
+                                                    >
                                                         {{ $inventorySource->name }}
                                                     </p>
 
@@ -243,10 +259,10 @@
                                                             class="!w-[100px]"
                                                             :id="$inputName"
                                                             :name="$inputName"
-                                                            :rules="'required|numeric|min_value:0|max_value:' . $item->qty_ordered"
-                                                            :value="$item->qty_to_ship"
+                                                            :rules="'required|numeric|min_value:0|max_value:' . $canShipQty['qty']"
+                                                            :value="$canShipQty['qty']"
                                                             :label="trans('admin::app.sales.shipments.create.qty-to-ship')"
-                                                            data-original-quantity="{{ $item->qty_to_ship }}"
+                                                            data-original-quantity="{{ $canShipQty['qty'] }}"
                                                             ::disabled="'{{ empty($sourceQty) }}' || source != '{{ $inventorySource->id }}'"
                                                             :ref="$inputName"
                                                         />
@@ -254,6 +270,10 @@
                                                         <x-admin::form.control-group.error :control-name="$inputName" />
                                                     </x-admin::form.control-group>
                                                 </div>
+
+												@if ($canShipQty['message'])
+													<p class="mt-1 text-xs italic text-green-600">{{ $canShipQty['message'] }}</p>
+												@endif
                                             </div>
                                         @endforeach
                                     @endif

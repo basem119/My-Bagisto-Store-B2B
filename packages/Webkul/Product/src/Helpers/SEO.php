@@ -3,23 +3,25 @@
 namespace Webkul\Product\Helpers;
 
 use Illuminate\Support\Facades\Storage;
+use Webkul\Category\Contracts\Category;
+use Webkul\Product\Contracts\Product;
 
 class SEO
 {
     /**
      * Returns product json ld data for product
      *
-     * @param  \Webkul\Product\Contracts\Product  $product
+     * @param  Product  $product
      * @return string
      */
     public function getProductJsonLd($product)
     {
         $data = [
-            '@context'    => 'https://schema.org/',
-            '@type'       => 'Product',
-            'name'        => $product->name,
-            'description' => $product->description,
-            'url'         => route('shop.product_or_category.index', $product->url_key),
+            '@context' => 'https://schema.org/',
+            '@type' => 'Product',
+            'name' => $product->name,
+            'description' => htmlspecialchars(trim(strip_tags($product->description))),
+            'url' => route('shop.product_or_category.index', $product->url_key),
         ];
 
         if (core()->getConfigData('catalog.rich_snippets.products.show_sku')) {
@@ -56,7 +58,7 @@ class SEO
     /**
      * Returns product categories
      *
-     * @param  \Webkul\Product\Contracts\Product  $product
+     * @param  Product  $product
      * @return string
      */
     public function getProductCategories($product)
@@ -75,7 +77,7 @@ class SEO
     /**
      * Returns product images
      *
-     * @param  \Webkul\Product\Contracts\Product  $product
+     * @param  Product  $product
      * @return array
      */
     public function getProductImages($product)
@@ -96,7 +98,7 @@ class SEO
     /**
      * Returns product reviews
      *
-     * @param  \Webkul\Product\Contracts\Product  $product
+     * @param  Product  $product
      * @return array
      */
     public function getProductReviews($product)
@@ -105,15 +107,15 @@ class SEO
 
         foreach ($product->reviews()->where('status', 'approved')->get() as $review) {
             $reviews[] = [
-                '@type'        => 'Review',
+                '@type' => 'Review',
                 'reviewRating' => [
-                    '@type'       => 'Rating',
+                    '@type' => 'Rating',
                     'ratingValue' => $review->rating,
-                    'bestRating'  => '5',
+                    'bestRating' => '5',
                 ],
-                'author'       => [
+                'author' => [
                     '@type' => 'Person',
-                    'name'  => $review->name,
+                    'name' => $review->name,
                 ],
             ];
         }
@@ -124,7 +126,7 @@ class SEO
     /**
      * Returns product average ratings
      *
-     * @param  \Webkul\Product\Contracts\Product  $product
+     * @param  Product  $product
      * @return array
      */
     public function getProductAggregateRating($product)
@@ -132,7 +134,7 @@ class SEO
         $reviewHelper = app('Webkul\Product\Helpers\Review');
 
         return [
-            '@type'       => 'AggregateRating',
+            '@type' => 'AggregateRating',
             'ratingValue' => $reviewHelper->getAverageRating($product),
             'reviewCount' => $reviewHelper->getTotalReviews($product),
         ];
@@ -141,37 +143,37 @@ class SEO
     /**
      * Returns product average ratings
      *
-     * @param  \Webkul\Product\Contracts\Product  $product
+     * @param  Product  $product
      * @return array
      */
     public function getProductOffers($product)
     {
         return [
-            '@type'         => 'Offer',
+            '@type' => 'Offer',
             'priceCurrency' => core()->getCurrentCurrencyCode(),
-            'price'         => $product->getTypeInstance()->getMinimalPrice(),
-            'availability'  => 'https://schema.org/InStock',
+            'price' => $product->getTypeInstance()->getMinimalPrice(),
+            'availability' => 'https://schema.org/InStock',
         ];
     }
 
     /**
      * Returns product json ld data for category
      *
-     * @param  \Webkul\Category\Contracts\Category  $category
+     * @param  Category  $category
      * @return array
      */
     public function getCategoryJsonLd($category)
     {
         $data = [
-            '@type'    => 'WebSite',
+            '@type' => 'WebSite',
             '@context' => 'http://schema.org',
-            'url'      => config('app.url'),
+            'url' => config('app.url'),
         ];
 
         if (core()->getConfigData('catalog.rich_snippets.categories.show_search_input_field')) {
             $data['potentialAction'] = [
-                '@type'       => 'SearchAction',
-                'target'      => config('app.url').'/search/?term={search_term_string}',
+                '@type' => 'SearchAction',
+                'target' => config('app.url').'/search/?term={search_term_string}',
                 'query-input' => 'required name=search_term_string',
             ];
         }

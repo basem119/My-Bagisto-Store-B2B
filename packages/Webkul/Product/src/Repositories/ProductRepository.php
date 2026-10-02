@@ -6,6 +6,7 @@ use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Webkul\Attribute\Enums\AttributeTypeEnum;
 use Webkul\Attribute\Repositories\AttributeRepository;
@@ -48,7 +49,7 @@ class ProductRepository extends Repository
     /**
      * Create product.
      *
-     * @return \Webkul\Product\Contracts\Product
+     * @return Product
      */
     public function create(array $data)
     {
@@ -64,7 +65,7 @@ class ProductRepository extends Repository
      *
      * @param  int  $id
      * @param  array  $attributes
-     * @return \Webkul\Product\Contracts\Product
+     * @return Product
      */
     public function update(array $data, $id, $attributes = [])
     {
@@ -96,7 +97,7 @@ class ProductRepository extends Repository
      * Copy product.
      *
      * @param  int  $id
-     * @return \Webkul\Product\Contracts\Product
+     * @return Product
      */
     public function copy($id)
     {
@@ -134,14 +135,14 @@ class ProductRepository extends Repository
      *
      * @param  string  $code
      * @param  mixed  $value
-     * @return \Webkul\Product\Contracts\Product
+     * @return Product
      */
     public function findByAttributeCode($code, $value)
     {
         $attribute = $this->attributeRepository->findOneByField('code', $code);
 
         $attributeValues = $this->productAttributeValueRepository->findWhere([
-            'attribute_id'          => $attribute->id,
+            'attribute_id' => $attribute->id,
             $attribute->column_name => $value,
         ]);
 
@@ -151,10 +152,14 @@ class ProductRepository extends Repository
                     ->where('channel', core()->getRequestedChannelCode())
                     ->where('locale', core()->getRequestedLocaleCode());
 
-                if ($attributeValues->isEmpty()) {
+                if ($filteredAttributeValues->isEmpty()) {
                     $filteredAttributeValues = $attributeValues
                         ->where('channel', core()->getRequestedChannelCode())
                         ->where('locale', core()->getDefaultLocaleCodeFromDefaultChannel());
+                }
+
+                if ($filteredAttributeValues->isEmpty()) {
+                    $filteredAttributeValues = $attributeValues;
                 }
             } else {
                 $filteredAttributeValues = $attributeValues
@@ -168,6 +173,10 @@ class ProductRepository extends Repository
                 if ($filteredAttributeValues->isEmpty()) {
                     $filteredAttributeValues = $attributeValues
                         ->where('locale', core()->getDefaultLocaleCodeFromDefaultChannel());
+                }
+
+                if ($filteredAttributeValues->isEmpty()) {
+                    $filteredAttributeValues = $attributeValues;
                 }
             } else {
                 $filteredAttributeValues = $attributeValues;
@@ -186,10 +195,10 @@ class ProductRepository extends Repository
             $indices = $this->elasticSearchRepository->search([
                 'url_key' => $slug,
             ], [
-                'type'  => '',
-                'from'  => 0,
+                'type' => '',
+                'from' => 0,
                 'limit' => 1,
-                'sort'  => 'id',
+                'sort' => 'id',
                 'order' => 'desc',
             ]);
 
@@ -218,7 +227,7 @@ class ProductRepository extends Repository
     /**
      * Get all products.
      *
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     public function getAll(array $params = [])
     {
@@ -232,7 +241,7 @@ class ProductRepository extends Repository
     /**
      * Search product from database.
      *
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     public function searchFromDatabase(array $params = [])
     {
@@ -247,8 +256,6 @@ class ProductRepository extends Repository
             'images',
             'videos',
             'attribute_values',
-            'super_attributes',
-            'super_attributes.options',
             'price_indices',
             'inventory_indices',
             'reviews',
@@ -310,6 +317,31 @@ class ProductRepository extends Repository
             $filterableAttributes = $this->attributeRepository->getProductDefaultAttributes(array_keys($params));
 
             /**
+             * Range filter for price-type attributes other than the base `price`
+             * (e.g. special_price, cost, or user-defined price attributes).
+             */
+            foreach ($filterableAttributes as $priceAttribute) {
+                if (
+                    $priceAttribute->type !== AttributeTypeEnum::PRICE->value
+                    || $priceAttribute->code === 'price'
+                    || empty($params[$priceAttribute->code])
+                ) {
+                    continue;
+                }
+
+                $range = explode(',', $params[$priceAttribute->code]);
+                $alias = $priceAttribute->code.'_price_range_values';
+
+                $qb->leftJoin('product_attribute_values as '.$alias, function ($join) use ($alias, $priceAttribute) {
+                    $join->on('products.id', '=', $alias.'.product_id')
+                        ->where($alias.'.attribute_id', $priceAttribute->id);
+                })->whereBetween($alias.'.float_value', [
+                    core()->convertToBasePrice(current($range)),
+                    core()->convertToBasePrice(end($range)),
+                ]);
+            }
+
+            /**
              * Filter the required attributes.
              */
             $attributes = $filterableAttributes->whereIn('code', [
@@ -355,12 +387,13 @@ class ProductRepository extends Repository
              * Filter the filterable attributes.
              */
             $attributes = $filterableAttributes->whereNotIn('code', [
-                'price',
                 'name',
                 'status',
                 'visible_individually',
                 'url_key',
-            ]);
+            ])->filter(function ($attribute) {
+                return $attribute->type !== AttributeTypeEnum::PRICE->value;
+            });
 
             /**
              * Filter query by attributes.
@@ -457,7 +490,7 @@ class ProductRepository extends Repository
     /**
      * Search product from elastic search.
      *
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     public function searchFromElastic(array $params = [])
     {
@@ -468,9 +501,9 @@ class ProductRepository extends Repository
         $sortOptions = $this->getSortOptions($params);
 
         $indices = $this->elasticSearchRepository->search($params, [
-            'from'  => ($currentPage * $limit) - $limit,
+            'from' => ($currentPage * $limit) - $limit,
             'limit' => $limit,
-            'sort'  => $sortOptions['sort'],
+            'sort' => $sortOptions['sort'],
             'order' => $sortOptions['order'],
         ]);
 
@@ -479,8 +512,6 @@ class ProductRepository extends Repository
             'images',
             'videos',
             'attribute_values',
-            'super_attributes',
-            'super_attributes.options',
             'price_indices',
             'inventory_indices',
             'reviews',
@@ -491,6 +522,7 @@ class ProductRepository extends Repository
             'variants.inventory_indices',
         ])->scopeQuery(function ($query) use ($params, $indices) {
             $qb = $query->distinct()
+                ->select('products.*')
                 ->whereIn('products.id', $indices['ids']);
 
             if (
@@ -502,7 +534,9 @@ class ProductRepository extends Repository
                     ->whereNull('product_customizable_options.id');
             }
 
-            $qb->orderBy(DB::raw('FIELD(id, '.implode(',', $indices['ids']).')'));
+            $table = DB::getTablePrefix().$query->getModel()->getTable();
+
+            $qb->orderBy(DB::raw('FIELD('.$table.'.id, '.implode(',', $indices['ids']).')'));
 
             return $qb;
         });
@@ -510,7 +544,7 @@ class ProductRepository extends Repository
         $items = $indices['total'] ? $query->get() : [];
 
         $results = new LengthAwarePaginator($items, $indices['total'], $limit, $currentPage, [
-            'path'  => request()->url(),
+            'path' => request()->url(),
             'query' => $params,
         ]);
 
@@ -536,8 +570,8 @@ class ProductRepository extends Repository
     /**
      * Returns product's super attribute with options.
      *
-     * @param  \Webkul\Product\Contracts\Product  $product
-     * @return \Illuminate\Support\Collection
+     * @param  Product  $product
+     * @return Collection
      */
     public function getSuperAttributes($product)
     {
@@ -545,14 +579,12 @@ class ProductRepository extends Repository
 
         foreach ($product->super_attributes as $key => $attribute) {
             $superAttributes[$key] = $attribute->toArray();
-            $superAttributes[$key]['options'] = [];
 
             foreach ($attribute->options as $option) {
                 $superAttributes[$key]['options'][] = [
-                    'id'           => $option->id,
-                    'label'        => $option->label,
-                    'admin_name'   => $option->admin_name,
-                    'sort_order'   => $option->sort_order,
+                    'id' => $option->id,
+                    'admin_name' => $option->admin_name,
+                    'sort_order' => $option->sort_order,
                     'swatch_value' => $option->swatch_value,
                 ];
             }
@@ -564,7 +596,7 @@ class ProductRepository extends Repository
     /**
      * Return category product maximum price.
      *
-     * @param  int  $categoryId
+     * @param  array  $params
      * @return float
      */
     public function getMaxPrice($params = [])
@@ -573,17 +605,43 @@ class ProductRepository extends Repository
             return $this->elasticSearchRepository->getMaxPrice($params);
         }
 
-        $customerGroup = $this->customerRepository->getCurrentGroup();
+        $attributeCode = $params['attribute_code'] ?? 'price';
 
-        $query = $this->model
-            ->leftJoin('product_price_indices', 'products.id', 'product_price_indices.product_id')
-            ->leftJoin('product_categories', 'products.id', 'product_categories.product_id')
-            ->where('product_price_indices.customer_group_id', $customerGroup->id);
+        if ($attributeCode === 'price') {
+            $customerGroup = $this->customerRepository->getCurrentGroup();
 
-        if (! empty($params['category_id'])) {
-            $query->where('product_categories.category_id', $params['category_id']);
+            $query = $this->model
+                ->leftJoin('product_price_indices', 'products.id', 'product_price_indices.product_id')
+                ->leftJoin('product_categories', 'products.id', 'product_categories.product_id')
+                ->where('product_price_indices.customer_group_id', $customerGroup->id);
+
+            if (! empty($params['category_id'])) {
+                $query->where('product_categories.category_id', $params['category_id']);
+            }
+
+            return $query->max('min_price') ?? 0;
         }
 
-        return $query->max('min_price') ?? 0;
+        $attribute = $this->attributeRepository->findOneByField('code', $attributeCode);
+
+        if (
+            ! $attribute
+            || $attribute->type !== AttributeTypeEnum::PRICE->value
+        ) {
+            return 0;
+        }
+
+        $query = $this->model
+            ->leftJoin('product_attribute_values as attr_pav', function ($join) use ($attribute) {
+                $join->on('products.id', '=', 'attr_pav.product_id')
+                    ->where('attr_pav.attribute_id', $attribute->id);
+            });
+
+        if (! empty($params['category_id'])) {
+            $query->leftJoin('product_categories', 'products.id', 'product_categories.product_id')
+                ->where('product_categories.category_id', $params['category_id']);
+        }
+
+        return $query->max('attr_pav.float_value') ?? 0;
     }
 }

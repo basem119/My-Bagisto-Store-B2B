@@ -2,6 +2,7 @@
 
 namespace Webkul\Payment\Payment;
 
+use Illuminate\Database\Eloquent\Collection;
 use Webkul\Checkout\Facades\Cart;
 
 abstract class Payment
@@ -20,16 +21,7 @@ abstract class Payment
      */
     public function isAvailable()
     {
-        $active = $this->getConfigData('active');
-
-        if ($active !== null) {
-            return (bool) $active;
-        }
-
-        // Fallback to config
-        $methods = config('payment_methods');
-
-        return isset($methods[$this->code]['active']) ? (bool) $methods[$this->code]['active'] : false;
+        return $this->getConfigData('active');
     }
 
     /**
@@ -123,7 +115,7 @@ abstract class Payment
     /**
      * Return paypal redirect url.
      *
-     * @var \Illuminate\Database\Eloquent\Collection
+     * @var Collection
      */
     public function getCartItems()
     {

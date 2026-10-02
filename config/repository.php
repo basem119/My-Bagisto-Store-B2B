@@ -1,5 +1,7 @@
 <?php
 
+use League\Fractal\Serializer\DataArraySerializer;
+
 /*
 |--------------------------------------------------------------------------
 | Prettus Repository Config
@@ -31,11 +33,11 @@ return [
     JsonApiSerializer
 
     */
-    'fractal'    => [
-        'params'     => [
+    'fractal' => [
+        'params' => [
             'include' => 'include',
         ],
-        'serializer' => League\Fractal\Serializer\DataArraySerializer::class,
+        'serializer' => DataArraySerializer::class,
     ],
 
     /*
@@ -44,7 +46,7 @@ return [
     |--------------------------------------------------------------------------
     |
     */
-    'cache'      => [
+    'cache' => [
         /*
          |--------------------------------------------------------------------------
          | Cache Status
@@ -53,7 +55,7 @@ return [
          | Enable or disable cache
          |
          */
-        'enabled'    => false,
+        'enabled' => false,
 
         /*
          |--------------------------------------------------------------------------
@@ -63,7 +65,7 @@ return [
          | Time of expiration cache
          |
          */
-        'minutes'    => 10080,
+        'minutes' => 10080,
 
         /*
          |--------------------------------------------------------------------------
@@ -83,7 +85,7 @@ return [
           |
           |
           */
-        'clean'      => [
+        'clean' => [
 
             /*
               |--------------------------------------------------------------------------
@@ -103,14 +105,14 @@ return [
               | delete : Clear Cache on delete Entry in repository
               |
               */
-            'on'      => [
+            'on' => [
                 'created' => true,
                 'updated' => true,
                 'deleted' => true,
             ],
         ],
 
-        'params'     => [
+        'params' => [
             /*
             |--------------------------------------------------------------------------
             | Skip Cache Params
@@ -138,8 +140,8 @@ return [
        |
        | 'except'  =>['find'],
        */
-        'allowed'    => [
-            'only'   => null,
+        'allowed' => [
+            'only' => null,
             'except' => null,
         ],
 
@@ -196,7 +198,7 @@ return [
     | Settings of request parameters names that will be used by Criteria
     |
     */
-    'criteria'   => [
+    'criteria' => [
         /*
         |--------------------------------------------------------------------------
         | Accepted Conditions
@@ -255,15 +257,15 @@ return [
         |   http://prettus.local/?search=lorem&searchJoin=or
         |
         */
-        'params'             => [
-            'search'       => 'search',
+        'params' => [
+            'search' => 'search',
             'searchFields' => 'searchFields',
-            'filter'       => 'filter',
-            'orderBy'      => 'orderBy',
-            'sortedBy'     => 'sortedBy',
-            'with'         => 'with',
-            'searchJoin'   => 'searchJoin',
-            'withCount'    => 'withCount',
+            'filter' => 'filter',
+            'orderBy' => 'orderBy',
+            'sortedBy' => 'sortedBy',
+            'with' => 'with',
+            'searchJoin' => 'searchJoin',
+            'withCount' => 'withCount',
         ],
     ],
     /*
@@ -272,20 +274,20 @@ return [
     |--------------------------------------------------------------------------
     |
     */
-    'generator'  => [
-        'basePath'          => app()->path(),
-        'rootNamespace'     => 'App\\',
+    'generator' => [
+        'basePath' => app()->path(),
+        'rootNamespace' => 'App\\',
         'stubsOverridePath' => app()->path(),
-        'paths'             => [
-            'models'       => 'Entities',
+        'paths' => [
+            'models' => 'Entities',
             'repositories' => 'Repositories',
-            'interfaces'   => 'Repositories',
+            'interfaces' => 'Repositories',
             'transformers' => 'Transformers',
-            'presenters'   => 'Presenters',
-            'validators'   => 'Validators',
-            'controllers'  => 'Http/Controllers',
-            'provider'     => 'RepositoryServiceProvider',
-            'criteria'     => 'Criteria',
+            'presenters' => 'Presenters',
+            'validators' => 'Validators',
+            'controllers' => 'Http/Controllers',
+            'provider' => 'RepositoryServiceProvider',
+            'criteria' => 'Criteria',
         ],
     ],
 ];

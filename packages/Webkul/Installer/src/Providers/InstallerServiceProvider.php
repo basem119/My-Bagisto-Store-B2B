@@ -8,6 +8,7 @@ use Illuminate\Support\ServiceProvider;
 use Webkul\Installer\Console\Commands\Installer as InstallerCommand;
 use Webkul\Installer\Http\Middleware\CanInstall;
 use Webkul\Installer\Http\Middleware\Locale;
+use Webkul\Installer\Http\Middleware\UseFileSession;
 
 class InstallerServiceProvider extends ServiceProvider
 {
@@ -32,6 +33,8 @@ class InstallerServiceProvider extends ServiceProvider
 
         $router->aliasMiddleware('installer_locale', Locale::class);
 
+        $router->aliasMiddleware('installer_file_session', UseFileSession::class);
+
         $this->loadRoutesFrom(__DIR__.'/../Routes/web.php');
 
         $this->loadViewsFrom(__DIR__.'/../Resources/views', 'installer');
@@ -42,7 +45,7 @@ class InstallerServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the Installer Commands of this package.
+     * Register the commands for this package.
      */
     protected function registerCommands(): void
     {

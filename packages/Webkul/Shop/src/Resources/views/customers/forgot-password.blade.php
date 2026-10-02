@@ -27,7 +27,7 @@
             >
                 <img
                     src="{{ core()->getCurrentChannel()->logo_url ?? bagisto_asset('images/logo.svg') }}"
-                    alt="{{ config('app.name') }}"
+                    alt="{{ core()->getCurrentChannel()->logo_alt ?: config('app.name') }}"
                     width="131"
                     height="29"
                 >
@@ -82,7 +82,7 @@
                         <x-shop::form.control-group class="mt-5">
                             {!! \Webkul\Customer\Facades\Captcha::render() !!}
 
-                            <x-shop::form.control-group.error control-name="g-recaptcha-response" />
+                            <x-shop::form.control-group.error control-name="recaptcha_token" />
                         </x-shop::form.control-group>
                     @endif
 
@@ -99,7 +99,8 @@
                     <p class="mt-5 font-medium text-zinc-500 max-sm:text-center max-sm:text-sm">
                         @lang('shop::app.customers.forgot-password.back')
 
-                        <a class="text-navyBlue"
+                        <a 
+                            class="text-navyBlue"
                             href="{{ route('shop.customer.session.index') }}"
                         >
                             @lang('shop::app.customers.forgot-password.sign-in-button')

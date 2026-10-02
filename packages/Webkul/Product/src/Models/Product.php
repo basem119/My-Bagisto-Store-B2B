@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
-use Shetabit\Visitor\Traits\Visitable;
 use Webkul\Attribute\Models\AttributeFamilyProxy;
 use Webkul\Attribute\Models\AttributeProxy;
 use Webkul\Attribute\Repositories\AttributeRepository;
@@ -25,7 +24,7 @@ use Webkul\Product\Type\AbstractType;
 
 class Product extends Model implements ProductContract
 {
-    use HasFactory, Visitable;
+    use HasFactory;
 
     /**
      * The attributes that are mass assignable.
@@ -47,7 +46,7 @@ class Product extends Model implements ProductContract
     /**
      * The type of product.
      *
-     * @var \Webkul\Product\Type\AbstractType
+     * @var AbstractType
      */
     protected $typeInstance;
 
@@ -295,9 +294,7 @@ class Product extends Model implements ProductContract
     /**
      * Is saleable.
      *
-     * @param  string  $key
-     *
-     * @throws \Exception
+     * @throws Exception
      */
     public function isSaleable(): bool
     {
@@ -309,7 +306,7 @@ class Product extends Model implements ProductContract
      * Is stockable.
      *
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function isStockable(): bool
     {
@@ -321,7 +318,7 @@ class Product extends Model implements ProductContract
      * Total quantity.
      *
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function totalQuantity(): int
     {
@@ -333,7 +330,7 @@ class Product extends Model implements ProductContract
      * Have sufficient quantity.
      *
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function haveSufficientQuantity(int $qty): bool
     {
@@ -345,7 +342,7 @@ class Product extends Model implements ProductContract
      * Get type instance.
      *
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function getTypeInstance(): AbstractType
     {
@@ -410,7 +407,7 @@ class Product extends Model implements ProductContract
      * @param  Group  $group
      * @param  bool  $skipSuperAttribute
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function getEditableAttributes($group = null, $skipSuperAttribute = true): Collection
     {

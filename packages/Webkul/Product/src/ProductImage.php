@@ -5,6 +5,7 @@ namespace Webkul\Product;
 use Illuminate\Support\Facades\Storage;
 use League\Flysystem\Local\LocalFilesystemAdapter;
 use Webkul\Customer\Contracts\Wishlist;
+use Webkul\Product\Contracts\Product;
 use Webkul\Product\Repositories\ProductRepository;
 
 class ProductImage
@@ -19,7 +20,7 @@ class ProductImage
     /**
      * Retrieve collection of gallery images.
      *
-     * @param  \Webkul\Product\Contracts\Product  $product
+     * @param  Product  $product
      * @return array
      */
     public function getGalleryImages($product)
@@ -35,7 +36,7 @@ class ProductImage
                 continue;
             }
 
-            $images[] = $this->getCachedImageUrls($image->path);
+            $images[] = $this->getCachedImageUrls($image->path, $this->resolveAltText($image, $product, count($images)));
         }
 
         if (
@@ -43,7 +44,7 @@ class ProductImage
             && ! count($images)
             && ! count($product->videos ?? [])
         ) {
-            $images[] = $this->getFallbackImageUrls();
+            $images[] = $this->getFallbackImageUrls($product?->name);
         }
 
         /*
@@ -61,7 +62,7 @@ class ProductImage
     /**
      * Get product variant image if available otherwise product base image.
      *
-     * @param  \Webkul\Customer\Contracts\Wishlist  $item
+     * @param  Wishlist  $item
      * @return array
      */
     public function getProductImage($item)
@@ -83,7 +84,7 @@ class ProductImage
      * This method will first check whether the gallery images are already
      * present or not. If not then it will load from the product.
      *
-     * @param  \Webkul\Product\Contracts\Product  $product
+     * @param  Product  $product
      * @param  array
      * @return array
      */
@@ -101,7 +102,7 @@ class ProductImage
     /**
      * Load product's base image.
      *
-     * @param  \Webkul\Product\Contracts\Product  $product
+     * @param  Product  $product
      * @return array
      */
     protected function otherwiseLoadFromProduct($product)
@@ -109,8 +110,28 @@ class ProductImage
         $images = $product?->images;
 
         return $images && $images->count()
-            ? $this->getCachedImageUrls($images[0]->path)
-            : $this->getFallbackImageUrls();
+            ? $this->getCachedImageUrls($images[0]->path, $this->resolveAltText($images[0], $product, 0))
+            : $this->getFallbackImageUrls($product?->name);
+    }
+
+    /**
+     * Resolve the alt text of an image, falling back to the product name so that a
+     * storefront image is never rendered without one.
+     *
+     * @param  Contracts\ProductImage  $image
+     * @param  Product  $product
+     */
+    private function resolveAltText($image, $product, int $index): string
+    {
+        if (filled($altText = $image->alt_text)) {
+            return $altText;
+        }
+
+        $name = (string) $product?->name;
+
+        return $index > 0
+            ? trim($name.' - '.($index + 1))
+            : $name;
     }
 
     /**
@@ -118,29 +139,31 @@ class ProductImage
      *
      * @param  string  $path
      */
-    private function getCachedImageUrls($path): array
+    private function getCachedImageUrls($path, string $altText = ''): array
     {
         if (! $this->isDriverLocal()) {
             return [
-                'small_image_url'    => Storage::url($path),
-                'medium_image_url'   => Storage::url($path),
-                'large_image_url'    => Storage::url($path),
+                'small_image_url' => Storage::url($path),
+                'medium_image_url' => Storage::url($path),
+                'large_image_url' => Storage::url($path),
                 'original_image_url' => Storage::url($path),
+                'alt' => $altText,
             ];
         }
 
         return [
-            'small_image_url'    => url('cache/small/'.$path),
-            'medium_image_url'   => url('cache/medium/'.$path),
-            'large_image_url'    => url('cache/large/'.$path),
+            'small_image_url' => url('cache/small/'.$path),
+            'medium_image_url' => url('cache/medium/'.$path),
+            'large_image_url' => url('cache/large/'.$path),
             'original_image_url' => url('cache/original/'.$path),
+            'alt' => $altText,
         ];
     }
 
     /**
      * Get fallback urls.
      */
-    private function getFallbackImageUrls(): array
+    private function getFallbackImageUrls(?string $altText = ''): array
     {
         $smallImageUrl = core()->getConfigData('catalog.products.cache_small_image.url')
                         ? Storage::url(core()->getConfigData('catalog.products.cache_small_image.url'))
@@ -155,10 +178,11 @@ class ProductImage
                         : bagisto_asset('images/large-product-placeholder.webp', 'shop');
 
         return [
-            'small_image_url'    => $smallImageUrl,
-            'medium_image_url'   => $mediumImageUrl,
-            'large_image_url'    => $largeImageUrl,
+            'small_image_url' => $smallImageUrl,
+            'medium_image_url' => $mediumImageUrl,
+            'large_image_url' => $largeImageUrl,
             'original_image_url' => bagisto_asset('images/large-product-placeholder.webp', 'shop'),
+            'alt' => (string) $altText,
         ];
     }
 

@@ -132,7 +132,6 @@
                                 :value="old('description')"
                                 :label="trans('admin::app.catalog.categories.create.description')"
                                 :tinymce="true"
-                                :prompt="core()->getConfigData('general.magic_ai.content_generation.category_description_prompt')"
                             />
 
                             <x-admin::form.control-group.error control-name="description" />
@@ -150,7 +149,11 @@
                                 @lang('admin::app.catalog.categories.create.logo-size')
                             </p>
 
-                            <x-admin::media.images name="logo_path" />
+                            <x-admin::media.images
+                                name="logo_path"
+                                meta-name="logo_meta"
+                                enable-seo="true"
+                            />
                         </div>
 
                         <!-- Add Banner -->
@@ -165,6 +168,8 @@
 
                             <x-admin::media.images
                                 name="banner_path"
+                                meta-name="banner_meta"
+                                enable-seo="true"
                                 width="220px"
                             />
                         </div>
@@ -182,7 +187,11 @@
                     </p>
 
                     <!-- SEO Title & Description Blade Component -->
-                    <x-admin::seo />
+                    <x-admin::seo
+                        meta-title-field="meta_title"
+                        url-key-field="slug"
+                        meta-description-field="meta_description"
+                    />
 
                     <div class="mt-8">
                         <!-- Meta Title -->
@@ -376,6 +385,7 @@
                                 <label
                                     class="cursor-pointer text-xs font-medium text-gray-600 dark:text-gray-300"
                                     for="{{ $attribute->name ?? $attribute->admin_name }}"
+                                    v-pre
                                 >
                                     {{ $attribute->name ?? $attribute->admin_name }}
                                 </label>

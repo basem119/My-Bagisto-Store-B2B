@@ -2,27 +2,39 @@
 
 namespace Webkul\Product\Type;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Webkul\Attribute\Contracts\Attribute;
+use Webkul\Attribute\Contracts\Group;
 use Webkul\Attribute\Repositories\AttributeRepository;
 use Webkul\Checkout\Facades\Cart;
 use Webkul\Checkout\Models\CartItem;
+use Webkul\Customer\Contracts\Wishlist;
 use Webkul\Customer\Repositories\CustomerRepository;
+use Webkul\Product\Contracts\ProductInventoryIndex;
+use Webkul\Product\Contracts\ProductPriceIndex;
 use Webkul\Product\DataTypes\CartItemValidationResult;
+use Webkul\Product\Exceptions\InsufficientProductInventoryException;
 use Webkul\Product\Facades\ProductImage;
+use Webkul\Product\Models\Product;
 use Webkul\Product\Repositories\ProductAttributeValueRepository;
 use Webkul\Product\Repositories\ProductCustomerGroupPriceRepository;
 use Webkul\Product\Repositories\ProductImageRepository;
 use Webkul\Product\Repositories\ProductInventoryRepository;
 use Webkul\Product\Repositories\ProductRepository;
 use Webkul\Product\Repositories\ProductVideoRepository;
+use Webkul\Sales\Contracts\InvoiceItem;
+use Webkul\Sales\Contracts\OrderItem;
+use Webkul\Sales\Contracts\ShipmentItem;
+use Webkul\Tax\Models\TaxCategory;
 
 abstract class AbstractType
 {
     /**
      * Product instance.
      *
-     * @var \Webkul\Product\Models\Product
+     * @var Product
      */
     protected $product;
 
@@ -197,7 +209,7 @@ abstract class AbstractType
 
     /**
      * @param  string  $code
-     * @return \Webkul\Attribute\Contracts\Attribute
+     * @return Attribute
      */
     public function getAttributeByCode($code)
     {
@@ -237,18 +249,18 @@ abstract class AbstractType
     /**
      * Copy attribute values.
      *
-     * @param  \Webkul\Product\Models\Product  $product
+     * @param  Product  $product
      */
     protected function copyAttributeValues($product): void
     {
         $attributesToSkip = config('products.copy.skip_attributes') ?? [];
 
         $copyAttributes = [
-            'name'           => trans('product::app.datagrid.copy-of', ['value' => $this->product->name]),
-            'url_key'        => trans('product::app.datagrid.copy-of-slug', ['value' => $this->product->url_key]),
-            'sku'            => $product->sku,
+            'name' => trans('product::app.datagrid.copy-of', ['value' => $this->product->name]),
+            'url_key' => trans('product::app.datagrid.copy-of-slug', ['value' => $this->product->url_key]),
+            'sku' => $product->sku,
             'product_number' => ! empty($this->product->product_number) ? trans('product::app.datagrid.copy-of-slug', ['value' => $this->product->product_number]) : null,
-            'status'         => 0,
+            'status' => 0,
         ];
 
         foreach ($this->product->attribute_values as $attributeValue) {
@@ -280,7 +292,7 @@ abstract class AbstractType
     /**
      * Copy relationships.
      *
-     * @param  \Webkul\Product\Models\Product  $product
+     * @param  Product  $product
      * @return void
      */
     protected function copyRelationships($product)
@@ -321,7 +333,7 @@ abstract class AbstractType
 
         if (! in_array('images', $attributesToSkip)) {
             foreach ($this->product->images as $image) {
-                $copiedImage = $product->images()->save($image->replicate());
+                $copiedImage = $product->images()->save($image->replicateWithTranslations());
 
                 $this->copyMedia($product, $image, $copiedImage);
             }
@@ -338,8 +350,22 @@ abstract class AbstractType
         if (! in_array('product_relations', $attributesToSkip)) {
             DB::table('product_relations')->insert([
                 'parent_id' => $this->product->id,
-                'child_id'  => $product->id,
+                'child_id' => $product->id,
             ]);
+        }
+
+        if (! in_array('customizable_options', $attributesToSkip)) {
+            foreach ($this->product->customizable_options as $customizableOption) {
+                $copiedCustomizableOption = $product->customizable_options()->save($customizableOption->replicate());
+
+                foreach ($customizableOption->translations as $translation) {
+                    $copiedCustomizableOption->translations()->save($translation->replicate());
+                }
+
+                foreach ($customizableOption->customizable_option_prices as $price) {
+                    $copiedCustomizableOption->customizable_option_prices()->save($price->replicate());
+                }
+            }
         }
     }
 
@@ -363,7 +389,7 @@ abstract class AbstractType
      * Specify type instance product.
      *
      * @param  \Webkul\Product\Contracts\Product  $product
-     * @return \Webkul\Product\Type\AbstractType
+     * @return AbstractType
      */
     public function setProduct($product)
     {
@@ -428,6 +454,16 @@ abstract class AbstractType
     public function isStockable()
     {
         return $this->isStockable;
+    }
+
+    /**
+     * Return true if a stock of this product can be kept and counted.
+     *
+     * Not `isStockable()`, which answers whether an order has anything to ship.
+     */
+    public function isInventoryManageable(): bool
+    {
+        return ! in_array('manage_stock', $this->skipAttributes);
     }
 
     /**
@@ -535,9 +571,9 @@ abstract class AbstractType
     /**
      * Retrieve product attributes.
      *
-     * @param  \Webkul\Attribute\Contracts\Group  $group
+     * @param  Group  $group
      * @param  bool  $skipSuperAttribute
-     * @return \Illuminate\Support\Collection
+     * @return Collection
      */
     public function getEditableAttributes($group = null, $skipSuperAttribute = true)
     {
@@ -592,7 +628,6 @@ abstract class AbstractType
     /**
      * Get product minimal price.
      *
-     * @param  int  $qty
      * @return float
      */
     public function getMinimalPrice()
@@ -674,7 +709,7 @@ abstract class AbstractType
     /**
      * Returns product price index of current customer group.
      *
-     * @return \Webkul\Product\Contracts\ProductPriceIndex
+     * @return ProductPriceIndex
      */
     public function getPriceIndex()
     {
@@ -692,7 +727,7 @@ abstract class AbstractType
     /**
      * Returns product inventory index of current channel.
      *
-     * @return \Webkul\Product\Contracts\ProductInventoryIndex
+     * @return ProductInventoryIndex
      */
     public function getInventoryIndex()
     {
@@ -728,12 +763,12 @@ abstract class AbstractType
     {
         return [
             'regular' => [
-                'price'           => core()->convertPrice($this->product->price),
+                'price' => core()->convertPrice($this->product->price),
                 'formatted_price' => core()->currency($this->product->price),
             ],
 
-            'final'   => [
-                'price'           => core()->convertPrice($minimalPrice = $this->getMinimalPrice()),
+            'final' => [
+                'price' => core()->convertPrice($minimalPrice = $this->getMinimalPrice()),
                 'formatted_price' => core()->currency($minimalPrice),
             ],
         ];
@@ -748,14 +783,14 @@ abstract class AbstractType
     {
         return view('shop::products.prices.index', [
             'product' => $this->product,
-            'prices'  => $this->getProductPrices(),
+            'prices' => $this->getProductPrices(),
         ])->render();
     }
 
     /**
      * Get tax category.
      *
-     * @return \Webkul\Tax\Models\TaxCategory
+     * @return TaxCategory
      */
     public function getTaxCategory()
     {
@@ -769,6 +804,8 @@ abstract class AbstractType
      *
      * @param  array  $data
      * @return array
+     *
+     * @throws InsufficientProductInventoryException
      */
     public function prepareForCart($data)
     {
@@ -777,30 +814,30 @@ abstract class AbstractType
         $data = $this->getQtyRequest($data);
 
         if (! $this->haveSufficientQuantity($data['quantity'])) {
-            return trans('product::app.checkout.cart.inventory-warning');
+            throw new InsufficientProductInventoryException(trans('product::app.checkout.cart.inventory-warning'));
         }
 
         $price = $this->getFinalPrice();
 
         $products = [
             [
-                'product_id'          => $this->product->id,
-                'sku'                 => $this->product->sku,
-                'quantity'            => $data['quantity'],
-                'name'                => $this->product->name,
-                'price'               => $convertedPrice = core()->convertPrice($price),
-                'price_incl_tax'      => $convertedPrice,
-                'base_price'          => $price,
+                'product_id' => $this->product->id,
+                'sku' => $this->product->sku,
+                'quantity' => $data['quantity'],
+                'name' => $this->product->name,
+                'price' => $convertedPrice = core()->convertPrice($price),
+                'price_incl_tax' => $convertedPrice,
+                'base_price' => $price,
                 'base_price_incl_tax' => $price,
-                'total'               => $convertedPrice * $data['quantity'],
-                'total_incl_tax'      => $convertedPrice * $data['quantity'],
-                'base_total'          => $price * $data['quantity'],
+                'total' => $convertedPrice * $data['quantity'],
+                'total_incl_tax' => $convertedPrice * $data['quantity'],
+                'base_total' => $price * $data['quantity'],
                 'base_total_incl_tax' => $price * $data['quantity'],
-                'weight'              => (float) ($this->product->weight ?? 0),
-                'total_weight'        => (float) ($this->product->weight ?? 0) * $data['quantity'],
-                'base_total_weight'   => (float) ($this->product->weight ?? 0) * $data['quantity'],
-                'type'                => $this->product->type,
-                'additional'          => $this->getAdditionalOptions($data),
+                'weight' => (float) ($this->product->weight ?? 0),
+                'total_weight' => (float) ($this->product->weight ?? 0) * $data['quantity'],
+                'base_total_weight' => (float) ($this->product->weight ?? 0) * $data['quantity'],
+                'type' => $this->product->type,
+                'additional' => $this->getAdditionalOptions($data),
             ],
         ];
 
@@ -878,7 +915,7 @@ abstract class AbstractType
      * Get actual ordered item.
      *
      * @param  \Webkul\Checkout\Contracts\CartItem  $item
-     * @return \Webkul\Checkout\Contracts\CartItem|\Webkul\Sales\Contracts\OrderItem|\Webkul\Sales\Contracts\InvoiceItem|\Webkul\Sales\Contracts\ShipmentItem|\Webkul\Customer\Contracts\Wishlist
+     * @return \Webkul\Checkout\Contracts\CartItem|OrderItem|InvoiceItem|ShipmentItem|Wishlist
      */
     public function getOrderedItem($item)
     {
@@ -1012,8 +1049,8 @@ abstract class AbstractType
         $discount = number_format((($this->product->price - $price) * 100) / ($this->product->price), 2);
 
         $offerLines = trans('product::app.type.abstract.offers', [
-            'qty'      => $customerGroupPrice->qty,
-            'price'    => core()->currency($price),
+            'qty' => $customerGroupPrice->qty,
+            'price' => core()->currency($price),
             'discount' => '<span>'.$discount.'%</span>',
         ]);
 

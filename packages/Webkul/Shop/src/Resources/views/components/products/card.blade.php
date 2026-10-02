@@ -19,8 +19,8 @@
 
                 <!-- Product Image -->
                 <a
-                    :href="`{{ route('shop.product_or_category.index', '') }}/${product.url_key}`"
-                    :aria-label="product.name + ' '"
+                    :href="'{{ route('shop.product_or_category.index', ':slug') }}'.replace(':slug', product.url_key)"
+                    :aria-label="product.name"
                 >
                     <x-shop::media.images.lazy
                         class="after:content-[' '] relative bg-zinc-100 transition-all duration-300 after:block after:pb-[calc(100%+9px)] group-hover:scale-105"
@@ -34,9 +34,10 @@
                         ::index="product.id"
                         width="291"
                         height="300"
-                        ::alt="product.name"
+                        ::alt="product.base_image.alt"
                     />
                 </a>
+
                 {!! view_render_event('bagisto.shop.components.products.card.image.after') !!}
 
                 <!-- Product Ratings -->
@@ -121,45 +122,17 @@
 
                 {!! view_render_event('bagisto.shop.components.products.card.name.before') !!}
 
-                <p class="break-all text-base font-medium max-md:mb-1.5 max-md:max-w-56 max-md:whitespace-break-spaces max-md:leading-6 max-sm:max-w-[192px] max-sm:text-sm max-sm:leading-4">
+                <p class="break-words text-base font-medium max-md:mb-1.5 max-md:max-w-56 max-md:whitespace-break-spaces max-md:leading-6 max-sm:max-w-[192px] max-sm:text-sm max-sm:leading-4">
                     @{{ product.name }}
                 </p>
 
                 {!! view_render_event('bagisto.shop.components.products.card.name.after') !!}
 
-                <!-- Color Swatches -->
-                <div
-                    v-if="product.type === 'configurable'"
-                    class="product-color-swatches"
-                    style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"
-                >
-                    <template v-for="attribute in product.super_attributes">
-                        <template v-if="attribute.code === 'color'">
-                            <span
-                                v-for="option in attribute.options"
-                                :key="option.id"
-                                class="color-swatch"
-                                :title="option.label"
-                                @click.stop="goToProductWithSwatch(attribute.id, option.id)"
-                                :style="{
-                                    display: 'inline-block',
-                                    width: '14px',
-                                    height: '14px',
-                                    borderRadius: '9999px',
-                                    border: '1px solid #ccc',
-                                    cursor: 'pointer',
-                                    backgroundColor: option.swatch_value
-                                }"
-                            ></span>
-                        </template>
-                    </template>
-                </div>
-
                 <!-- Pricing -->
                 {!! view_render_event('bagisto.shop.components.products.card.price.before') !!}
 
                 <div
-                    class="flex items-center gap-2.5 text-lg font-semibold max-sm:text-sm max-sm:leading-6"
+                    class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-lg font-semibold max-sm:text-sm max-sm:leading-6"
                     v-html="product.price_html"
                 >
                 </div>
@@ -173,6 +146,7 @@
 
                         <button
                             class="secondary-button w-full max-w-full p-2.5 text-sm font-medium max-sm:rounded-xl max-sm:p-2"
+                            :disabled="! product.is_saleable || isAddingToCart"
                             @click="addToCart()"
                         >
                             @lang('shop::app.components.products.card.add-to-cart')
@@ -224,7 +198,7 @@
 
                 {!! view_render_event('bagisto.shop.components.products.card.image.before') !!}
 
-                <a :href="`{{ route('shop.product_or_category.index', '') }}/${product.url_key}`">
+                <a :href="'{{ route('shop.product_or_category.index', ':slug') }}'.replace(':slug', product.url_key)">
                     <x-shop::media.images.lazy
                         class="after:content-[' '] relative min-w-[250px] bg-zinc-100 transition-all duration-300 after:block after:pb-[calc(100%+9px)] group-hover:scale-105"
                         ::src="product.base_image.medium_image_url"
@@ -232,7 +206,7 @@
                         ::index="product.id"
                         width="291"
                         height="300"
-                        ::alt="product.name"
+                        ::alt="product.base_image.alt"
                     />
                 </a>
 
@@ -302,7 +276,7 @@
                 {!! view_render_event('bagisto.shop.components.products.card.price.before') !!}
 
                 <div
-                    class="flex gap-2.5 text-lg font-semibold"
+                    class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-lg font-semibold"
                     v-html="product.price_html"
                 >
                 </div>
@@ -353,6 +327,8 @@
                     <x-shop::button
                         class="primary-button whitespace-nowrap px-8 py-2.5"
                         :title="trans('shop::app.components.products.card.add-to-cart')"
+                        ::loading="isAddingToCart"
+                        ::disabled="! product.is_saleable || isAddingToCart"
                         @click="addToCart()"
                     />
 
@@ -451,26 +427,33 @@
                     return JSON.parse(value);
                 },
 
-                getProductUrl(params = null) {
-                    let baseUrl = `{{ route('shop.product_or_category.index', '') }}/${this.product.url_key}`;
-
-                    if (! params) {
-                        return baseUrl;
-                    }
-
-                    let query = new URLSearchParams(params).toString();
-
-                    return query ? `${baseUrl}?${query}` : baseUrl;
-                },
-
-                goToProductWithSwatch(attributeId, optionId) {
-                    window.location.href = this.getProductUrl({
-                        [`super_attribute[${attributeId}]`]: optionId
-                    });
-                },
-
                 addToCart() {
-                    window.location.href = this.getProductUrl();
+                    this.isAddingToCart = true;
+
+                    this.$axios.post('{{ route("shop.api.checkout.cart.store") }}', {
+                            'quantity': 1,
+                            'product_id': this.product.id,
+                        })
+                        .then(response => {
+                            if (response.data.message) {
+                                this.$emitter.emit('update-mini-cart', response.data.data );
+
+                                this.$emitter.emit('add-flash', { type: 'success', message: response.data.message });
+                            } else {
+                                this.$emitter.emit('add-flash', { type: 'warning', message: response.data.data.message });
+                            }
+
+                            this.isAddingToCart = false;
+                        })
+                        .catch(error => {
+                            this.$emitter.emit('add-flash', { type: 'error', message: error.response.data.message });
+
+                            if (error.response.data.redirect_uri) {
+                                window.location.href = error.response.data.redirect_uri;
+                            }
+
+                            this.isAddingToCart = false;
+                        });
                 },
             },
         });

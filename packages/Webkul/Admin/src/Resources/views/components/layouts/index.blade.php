@@ -33,6 +33,10 @@
         name="currency"
         content="{{ core()->getBaseCurrency()->toJson() }}"
     >
+    <meta
+        name="generator"
+        content="Bagisto"
+    >
 
     @stack('meta')
 
@@ -82,6 +86,7 @@
 <body class="h-full dark:bg-gray-950">
     {!! view_render_event('bagisto.admin.layout.body.before') !!}
 
+    <!-- Built With Bagisto -->
     <div
         id="app"
         class="h-full"
@@ -109,13 +114,6 @@
             <div class="flex min-h-[calc(100vh-62px)] max-w-full flex-1 flex-col bg-white transition-all duration-300 dark:bg-gray-950 pt-3 px-2 sm:px-4 lg:pt-3 lg:px-4 lg:ltr:pl-[286px] lg:group-[.sidebar-collapsed]/container:ltr:pl-[85px] lg:rtl:pr-[286px] lg:group-[.sidebar-collapsed]/container:rtl:pr-[85px]">
                 <!-- Added dynamic tabs for third level menus  -->
                 <div class="pb-4 lg:pb-6">
-                    <!-- Todo @suraj-webkul need to optimize below statement. -->
-                    @if (! request()->routeIs('admin.configuration.index'))
-                        <div class="overflow-x-auto">
-                            <x-admin::layouts.tabs />
-                        </div>
-                    @endif
-
                     <!-- Page Content Blade Component -->
                     <div class="w-full overflow-x-hidden">
                         {{ $slot }}

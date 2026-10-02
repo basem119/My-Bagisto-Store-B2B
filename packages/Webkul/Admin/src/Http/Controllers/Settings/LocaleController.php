@@ -3,9 +3,11 @@
 namespace Webkul\Admin\Http\Controllers\Settings;
 
 use Illuminate\Http\JsonResponse;
+use Illuminate\View\View;
 use Webkul\Admin\DataGrids\Settings\LocalesDataGrid;
 use Webkul\Admin\Http\Controllers\Controller;
 use Webkul\Core\Repositories\LocaleRepository;
+use Webkul\Core\Rules\Code;
 
 class LocaleController extends Controller
 {
@@ -19,7 +21,7 @@ class LocaleController extends Controller
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function index()
     {
@@ -36,10 +38,10 @@ class LocaleController extends Controller
     public function store(): JsonResponse
     {
         $this->validate(request(), [
-            'code'        => ['required', 'unique:locales,code', new \Webkul\Core\Rules\Code],
-            'name'        => 'required',
-            'direction'   => 'required|in:ltr,rtl',
-            'logo_path'   => 'array',
+            'code' => ['required', 'unique:locales,code', new Code],
+            'name' => 'required',
+            'direction' => 'required|in:ltr,rtl',
+            'logo_path' => 'array',
             'logo_path.*' => 'image|extensions:jpeg,jpg,png,svg,webp',
         ]);
 
@@ -73,9 +75,9 @@ class LocaleController extends Controller
     public function update(): JsonResponse
     {
         $this->validate(request(), [
-            'name'        => 'required',
-            'direction'   => 'required|in:ltr,rtl',
-            'logo_path'   => 'array',
+            'name' => 'required',
+            'direction' => 'required|in:ltr,rtl',
+            'logo_path' => 'array',
             'logo_path.*' => 'image|extensions:jpeg,jpg,png,svg,webp',
         ]);
 

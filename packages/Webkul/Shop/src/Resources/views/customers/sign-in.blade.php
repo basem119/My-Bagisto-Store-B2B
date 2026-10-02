@@ -27,7 +27,7 @@
             >
                 <img
                     src="{{ core()->getCurrentChannel()->logo_url ?? bagisto_asset('images/logo.svg') }}"
-                    alt="{{ config('app.name') }}"
+                    alt="{{ core()->getCurrentChannel()->logo_alt ?: config('app.name') }}"
                     width="131"
                     height="29"
                 >
@@ -50,7 +50,6 @@
 
             <div class="mt-14 rounded max-sm:mt-8">
                 <x-shop::form :action="route('shop.customer.session.create')">
-
                     {!! view_render_event('bagisto.shop.customers.login_form_controls.before') !!}
 
                     <!-- Email -->
@@ -135,7 +134,7 @@
                         <x-shop::form.control-group class="mt-5">
                             {!! \Webkul\Customer\Facades\Captcha::render() !!}
 
-                            <x-shop::form.control-group.error control-name="g-recaptcha-response" />
+                            <x-shop::form.control-group.error control-name="recaptcha_token" />
                         </x-shop::form.control-group>
                     @endif
 
@@ -147,13 +146,27 @@
                         >
                             @lang('shop::app.customers.login-form.button-title')
                         </button>
-
-                        {!! view_render_event('bagisto.shop.customers.login_form_controls.after') !!}
                     </div>
+
+                    {!! view_render_event('bagisto.shop.customers.login_form_controls.after') !!}
                 </x-shop::form>
             </div>
 
             {!! view_render_event('bagisto.shop.customers.login.after') !!}
+
+            @if (
+                request()->cookie('enable-resend')
+                && request()->cookie('email-for-resend')
+            )
+                <p class="mt-5 font-medium text-zinc-500 max-sm:text-center max-sm:text-sm">
+                    <a
+                        class="text-navyBlue"
+                        href="{{ route('shop.customers.resend.verification_email', urlencode(request()->cookie('email-for-resend'))) }}"
+                    >
+                        @lang('shop::app.customers.login-form.resend-verification')
+                    </a>
+                </p>
+            @endif
 
             <p class="mt-5 font-medium text-zinc-500 max-sm:text-center max-sm:text-sm">
                 @lang('shop::app.customers.login-form.new-customer')

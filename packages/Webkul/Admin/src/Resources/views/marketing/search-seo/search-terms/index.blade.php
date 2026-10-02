@@ -115,7 +115,7 @@
 
                             <!-- Actions -->
                             <div class="flex justify-end">
-                                @if (bouncer()->hasPermission('marketing.search_terms.edit'))
+                                @if (bouncer()->hasPermission('marketing.search_seo.search_terms.edit'))
                                     <a @click="selectedSitemap=1; editModal(record)">
                                         <span
                                             :class="record.actions.find(action => action.index === 'edit')?.icon"
@@ -125,7 +125,7 @@
                                     </a>
                                 @endif
 
-                                @if (bouncer()->hasPermission('marketing.search_terms.delete'))
+                                @if (bouncer()->hasPermission('marketing.search_seo.search_terms.delete'))
                                     <a @click="performAction(record.actions.find(action => action.index === 'delete'))">
                                         <span
                                             :class="record.actions.find(action => action.index === 'delete')?.icon"
@@ -263,7 +263,12 @@
                                     :label="trans('admin::app.marketing.search-seo.search-terms.index.create.channel')"
                                 >
                                     @foreach (core()->getAllChannels() as $channel)
-                                        <option value="{{ $channel->id }}">{{ $channel->name }}</option>
+                                        <option 
+                                            value="{{ $channel->id }}"
+                                            v-pre
+                                        >
+                                            {{ $channel->name }}
+                                        </option>
                                     @endforeach
                                 </x-admin::form.control-group.control>
 
@@ -283,7 +288,12 @@
                                     :label="trans('admin::app.marketing.search-seo.search-terms.index.create.locale')"
                                 >
                                     @foreach (core()->getAllLocales() as $locale)
-                                        <option value="{{ $locale->code }}">{{ $locale->name }}</option>
+                                        <option 
+                                            value="{{ $locale->code }}"
+                                            v-pre
+                                        >
+                                            {{ $locale->name }}
+                                        </option>
                                     @endforeach
                                 </x-admin::form.control-group.control>
 

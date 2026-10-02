@@ -1,7 +1,7 @@
 <!-- Mini Cart Vue Component -->
 <v-mini-cart>
     <span
-        class="icon-cart cursor-pointer text-2xl leading-none w-full h-full flex items-end justify-center"
+        class="icon-cart cursor-pointer text-2xl"
         role="button"
         aria-label="@lang('shop::app.checkout.cart.mini-cart.shopping-cart')"
     ></span>
@@ -22,7 +22,7 @@
 
                     <span class="relative">
                         <span
-                            class="icon-cart cursor-pointer text-2xl leading-none w-full h-full flex items-end justify-center"
+                            class="icon-cart cursor-pointer text-2xl"
                             role="button"
                             aria-label="@lang('shop::app.checkout.cart.mini-cart.shopping-cart')"
                             tabindex="0"
@@ -83,9 +83,10 @@
                             {!! view_render_event('bagisto.shop.checkout.mini-cart.drawer.content.image.before') !!}
 
                             <div class="">
-                                <a :href="`{{ route('shop.product_or_category.index', '') }}/${item.product_url_key}`">
+                                <a :href="'{{ route('shop.product_or_category.index', ':slug') }}'.replace(':slug', item.product_url_key)">
                                     <img
                                         :src="item.base_image.small_image_url"
+                                        :alt="item.base_image.alt"
                                         class="max-w-28 max-h-28 rounded-xl max-md:max-h-20 max-md:max-w-[76px]"
                                     />
                                 </a>
@@ -101,7 +102,7 @@
 
                                     <a
                                     class="max-w-4/5 max-md:w-full"
-                                    :href="`{{ route('shop.product_or_category.index', '') }}/${item.product_url_key}`"
+                                    :href="'{{ route('shop.product_or_category.index', ':slug') }}'.replace(':slug', item.product_url_key)"
                                 >
                                         <p class="text-base font-medium max-md:font-normal max-sm:text-sm">
                                             @{{ item.name }}
@@ -202,10 +203,13 @@
                                 <!-- Cart Item Quantity Changer -->
                                 <x-shop::quantity-changer
                                     v-if="item.can_change_qty"
+                                    ::key="'qty-' + item.id + '-' + refreshKey"
                                     class="max-h-9 max-w-[150px] gap-x-2.5 rounded-[54px] px-3.5 py-1.5 max-md:gap-x-2 max-md:px-1 max-md:py-0.5"
                                     name="quantity"
                                     ::value="item?.quantity"
+                                    :removable="true"
                                     @change="updateItem($event, item)"
+                                    @remove="removeItem(item.id)"
                                 />
 
                                     {!! view_render_event('bagisto.shop.checkout.mini-cart.drawer.content.quantity_changer.after') !!}
@@ -356,7 +360,7 @@
 
                     <span class="relative">
                         <span
-                            class="icon-cart cursor-pointer text-2xl leading-none w-full h-full flex items-end justify-center"
+                            class="icon-cart cursor-pointer text-2xl"
                             role="button"
                             aria-label="@lang('shop::app.checkout.cart.mini-cart.shopping-cart')"
                             tabindex="0"
@@ -377,13 +381,25 @@
         {!! view_render_event('bagisto.shop.checkout.mini-cart.drawer.after') !!}
     </script>
 
+    @php
+        /**
+         * When the cart is empty there is nothing to fetch, so the mini-cart is
+         * seeded with an empty cart server-side. This avoids an `/api/checkout/cart`
+         * request (and a `Cart::collectTotals()` recalculation) on every page view
+         * for the common case of a guest with no cart.
+         */
+        $hasCartItems = (bool) \Webkul\Checkout\Facades\Cart::getCart()?->items->isNotEmpty();
+    @endphp
+
     <script type="module">
         app.component("v-mini-cart", {
             template: '#v-mini-cart-template',
 
             data() {
                 return  {
-                    cart: null,
+                    refreshKey: 0,
+
+                    cart: {!! $hasCartItems ? 'null' : json_encode(['items_qty' => 0, 'items' => []]) !!},
 
                     isLoading:false,
 
@@ -391,7 +407,7 @@
                         prices: "{{ core()->getConfigData('sales.taxes.shopping_cart.display_prices') }}",
                         subtotal: "{{ core()->getConfigData('sales.taxes.shopping_cart.display_subtotal') }}",
                     },
-                }
+                };
             },
 
             mounted() {
@@ -425,14 +441,44 @@
 
                     this.$axios.put('{{ route('shop.api.checkout.cart.update') }}', { qty })
                         .then(response => {
-                            if (response.data.message) {
-                                this.cart = response.data.data;
+                            this.isLoading = false;
+
+                            /**
+                             * The update endpoint returns `{ data: CartResource, message }`
+                             * on success and only `{ message }` on failure (e.g.
+                             * inventory-warning). Only treat the payload as a cart when
+                             * it has an `items` field — otherwise surface the server
+                             * message as a warning flash.
+                             */
+                            const payload = response.data.data;
+
+                            if (payload && payload.items !== undefined) {
+                                this.cart = payload;
                             } else {
-                                this.$emitter.emit('add-flash', { type: 'warning', message: response.data.data.message });
+                                this.$emitter.emit('add-flash', {
+                                    type: 'warning',
+                                    message: payload?.message || response.data.message,
+                                });
                             }
 
+                            /**
+                             * Bump the key so the quantity-changer remounts from the
+                             * current server value even when the update was rejected
+                             * (in which case `value` didn't change and the component's
+                             * `value` watcher wouldn't fire).
+                             */
+                            this.refreshKey++;
+                        })
+                        .catch(error => {
                             this.isLoading = false;
-                        }).catch(error => this.isLoading = false);
+
+                            this.$emitter.emit('add-flash', {
+                                type: 'error',
+                                message: error.response?.data?.message || error.message,
+                            });
+
+                            this.refreshKey++;
+                        });
                 },
 
                 removeItem(itemId) {

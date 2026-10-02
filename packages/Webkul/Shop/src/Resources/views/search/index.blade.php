@@ -28,7 +28,7 @@
         @endif
 
         <div class="mt-8 flex items-center justify-between max-md:mt-5">
-            <h2 class="text-2xl font-medium max-sm:text-base">
+            <h2 class="break-all text-2xl font-medium max-sm:text-base">
                 <span v-text="'{{ preg_replace('/[,\\"\\\']+/', '', $title) }}'" ></span>
             </h2>
         </div>
@@ -53,12 +53,15 @@
                     value="0"
                 >
 
-                <p class="mt-1 text-sm text-gray-600">
+                <p
+                    class="mt-1 text-sm text-gray-600"
+                    v-pre
+                >
                     {{ trans('shop::app.search.suggest') }}
 
                     <button
                         type="submit"
-                        class="text-red-600 hover:text-red-800 hover:underline"
+                        class="text-blue-600 hover:text-blue-800 hover:underline"
                         aria-label="{{ trans('shop::app.components.layouts.header.desktop.bottom.submit') }}"
                     >
                         {{ $searchInstead }}
@@ -308,24 +311,6 @@
                     }
                 },
             });
-        </script>
-
-        <script>
-            (function () {
-                const query = {!! json_encode($query, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!};
-
-                if (! query || typeof window.fbqTrack !== 'function') {
-                    return;
-                }
-
-                window.fbqTrack('Search', {
-                    search_string: query,
-                    content_type: 'search',
-                    content_category: 'search',
-                    value: 0,
-                    currency: '{{ core()->getCurrentCurrencyCode() }}',
-                });
-            })();
         </script>
     @endPushOnce
 </x-shop::layouts>

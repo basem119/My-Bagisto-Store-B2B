@@ -48,22 +48,23 @@ class ElasticSearchRepository
             $filters['filter'][]['term']['type'] = $params['type'];
         }
 
-        $results = Elasticsearch::search([
+        $results = ElasticSearch::search([
             'index' => $params['index'] ?? $this->getIndexName(),
-            'body'  => [
-                'from'          => $options['from'],
-                'size'          => $options['limit'],
+            'ignore_unavailable' => true,
+            'body' => [
+                'from' => $options['from'],
+                'size' => $options['limit'],
                 'stored_fields' => [],
-                'query'         => [
+                'query' => [
                     'bool' => $filters ?: new \stdClass,
                 ],
-                'sort'          => $this->getSortOptions($options),
+                'sort' => $this->getSortOptions($options),
             ],
         ]);
 
         return [
             'total' => $results['hits']['total']['value'],
-            'ids'   => collect($results['hits']['hits'])->pluck('_id')->toArray(),
+            'ids' => collect($results['hits']['hits'])->pluck('_id')->toArray(),
         ];
     }
 
@@ -76,14 +77,15 @@ class ElasticSearchRepository
             return null;
         }
 
-        $results = Elasticsearch::search([
+        $results = ElasticSearch::search([
             'index' => $this->getIndexName(),
-            'body'  => [
+            'ignore_unavailable' => true,
+            'body' => [
                 'suggest' => [
                     'name_suggest' => [
                         'text' => $queryText,
                         'term' => [
-                            'field'        => 'name',
+                            'field' => 'name',
                             'suggest_mode' => 'always',
                         ],
                     ],
@@ -134,8 +136,6 @@ class ElasticSearchRepository
             case AttributeTypeEnum::BOOLEAN->value:
                 $values = array_map('intval', explode(',', $params[$attribute->code]));
 
-                $values = array_map('intval', explode(',', $params[$attribute->code]));
-
                 return [
                     'terms' => [
                         $attribute->code => $values,
@@ -143,13 +143,15 @@ class ElasticSearchRepository
                 ];
 
             case AttributeTypeEnum::PRICE->value:
-                $customerGroup = $this->customerRepository->getCurrentGroup();
-
                 $range = explode(',', $params[$attribute->code]);
+
+                $field = $attribute->code === 'price'
+                    ? 'price_'.$this->customerRepository->getCurrentGroup()->id
+                    : $attribute->code;
 
                 return [
                     'range' => [
-                        $attribute->code.'_'.$customerGroup->id => [
+                        $field => [
                             'gte' => core()->convertToBasePrice(current($range)),
                             'lte' => core()->convertToBasePrice(end($range)),
                         ],
@@ -157,18 +159,17 @@ class ElasticSearchRepository
                 ];
 
             case AttributeTypeEnum::TEXT->value:
-                $synonyms = $this->searchSynonymRepository->getSynonymsByQuery($params[$attribute->code]);
+                $filter = [];
 
-                $synonyms = array_map(function ($synonym) {
-                    return '"'.$synonym.'"';
-                }, $synonyms);
+                foreach ($this->searchSynonymRepository->getSynonymsByQuery($params[$attribute->code]) as $synonym) {
+                    $filter['bool']['should'][] = [
+                        'match_phrase_prefix' => [
+                            $attribute->code => $synonym,
+                        ],
+                    ];
+                }
 
-                return [
-                    'query_string' => [
-                        'query'         => implode(' OR ', $synonyms),
-                        'default_field' => $attribute->code,
-                    ],
-                ];
+                return $filter;
 
             case AttributeTypeEnum::SELECT->value:
                 $filter[]['terms'][$attribute->code] = explode(',', $params[$attribute->code]);
@@ -202,9 +203,9 @@ class ElasticSearchRepository
         if ($options['order'] == 'rand') {
             return [
                 '_script' => [
-                    'type'   => 'number',
+                    'type' => 'number',
                     'script' => 'Math.random()',
-                    'order'  => 'asc',
+                    'order' => 'asc',
                 ],
             ];
         }
@@ -243,19 +244,24 @@ class ElasticSearchRepository
             $filters['filter'][]['term']['type'] = $params['type'];
         }
 
-        $customerGroupId = $this->customerRepository->getCurrentGroup()->id;
+        $attributeCode = $params['attribute_code'] ?? 'price';
 
-        $results = Elasticsearch::search([
-            'index'         => $params['index'] ?? $this->getIndexName(),
-            'body'          => [
-                'size'  => 0,
+        $field = $attributeCode === 'price'
+            ? 'price_'.$this->customerRepository->getCurrentGroup()->id
+            : $attributeCode;
+
+        $results = ElasticSearch::search([
+            'index' => $params['index'] ?? $this->getIndexName(),
+            'ignore_unavailable' => true,
+            'body' => [
+                'size' => 0,
                 'query' => [
                     'bool' => $filters ?: new \stdClass,
                 ],
                 'aggs' => [
                     'max_price' => [
                         'max' => [
-                            'field' => 'price_'.$customerGroupId,
+                            'field' => $field,
                         ],
                     ],
                 ],
@@ -282,10 +288,11 @@ class ElasticSearchRepository
 
         $customerGroupId = $this->customerRepository->getCurrentGroup()->id;
 
-        $results = Elasticsearch::search([
-            'index'         => $params['index'] ?? $this->getIndexName(),
-            'body'          => [
-                'size'  => 0,
+        $results = ElasticSearch::search([
+            'index' => $params['index'] ?? $this->getIndexName(),
+            'ignore_unavailable' => true,
+            'body' => [
+                'size' => 0,
                 'query' => [
                     'bool' => $filters ?: new \stdClass,
                 ],

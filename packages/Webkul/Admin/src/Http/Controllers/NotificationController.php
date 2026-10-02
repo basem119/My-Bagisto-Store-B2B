@@ -2,6 +2,7 @@
 
 namespace Webkul\Admin\Http\Controllers;
 
+use Illuminate\View\View;
 use Webkul\Notification\Repositories\NotificationRepository;
 
 class NotificationController extends Controller
@@ -16,7 +17,7 @@ class NotificationController extends Controller
     /**
      * Display a listing of the resource.
      *
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function index()
     {
@@ -42,8 +43,8 @@ class NotificationController extends Controller
 
         return [
             'search_results' => $results,
-            'status_count'   => $statusCount,
-            'total_unread'   => $this->notificationRepository->where('read', 0)->count(),
+            'status_count' => $statusCount,
+            'total_unread' => $this->notificationRepository->where('read', 0)->count(),
         ];
     }
 
@@ -51,7 +52,7 @@ class NotificationController extends Controller
      * Update the notification is reade or not.
      *
      * @param  int  $orderId
-     * @return \Illuminate\View\View
+     * @return View
      */
     public function viewedNotifications($orderId)
     {
@@ -77,12 +78,12 @@ class NotificationController extends Controller
 
         $searchResults = $this->notificationRepository->getParamsData([
             'limit' => 5,
-            'read'  => 0,
+            'read' => 0,
         ]);
 
         return [
-            'search_results'  => $searchResults,
-            'total_unread'    => $this->notificationRepository->where('read', 0)->count(),
+            'search_results' => $searchResults,
+            'total_unread' => $this->notificationRepository->where('read', 0)->count(),
             'success_message' => trans('admin::app.notifications.marked-success'),
         ];
     }

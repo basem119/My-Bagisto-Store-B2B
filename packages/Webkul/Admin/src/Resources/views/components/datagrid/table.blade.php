@@ -33,7 +33,7 @@
 
                     <template v-else>
                         <div
-                            class="row grid min-h-[47px] items-center gap-2.5 border-b bg-gray-50 px-4 py-2.5 font-semibold text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                            class="row datagrid-head grid"
                             :style="`grid-template-columns: repeat(${gridsCount}, minmax(150px, 1fr))`"
                         >
                             <!-- Mass Actions -->
@@ -154,9 +154,20 @@
                         </template>
 
                         <template v-else>
-                            <div class="row grid border-b px-4 py-4 text-center text-gray-600 dark:border-gray-800 dark:text-gray-300">
-                                <p>
+                            <div class="row grid min-h-[260px] place-content-center justify-items-center gap-3 border-b px-4 py-8 text-center text-gray-600 dark:border-gray-800 dark:text-gray-300">
+                                <img
+                                    class="h-[120px] w-[120px] select-none p-2 dark:mix-blend-exclusion dark:invert"
+                                    src="{{ bagisto_asset('images/empty-placeholders/default.svg') }}"
+                                    alt=""
+                                    aria-hidden="true"
+                                />
+
+                                <p class="text-base font-semibold text-gray-500 dark:text-gray-300">
                                     @lang('admin::app.components.datagrid.table.no-records-available')
+                                </p>
+
+                                <p class="max-w-sm text-sm text-gray-400 dark:text-gray-400">
+                                    @lang('admin::app.components.datagrid.table.no-records-hint')
                                 </p>
                             </div>
                         </template>
