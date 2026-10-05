@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Webkul\Core\Http\Middleware\NoCacheMiddleware;
 use Webkul\Marketplace\Http\Controllers\Admin\VendorController;
+use Webkul\Marketplace\Http\Controllers\Admin\VendorOrderController;
 use Webkul\Marketplace\Http\Controllers\Admin\VendorProductController;
 
 /**
@@ -26,4 +27,6 @@ Route::group(['middleware' => ['admin', NoCacheMiddleware::class], 'prefix' => c
     });
 
     Route::get('vendor-products', [VendorProductController::class, 'index'])->name('marketplace.admin.vendor-products.index');
+
+    Route::get('vendor-orders', [VendorOrderController::class, 'index'])->name('marketplace.admin.vendor-orders.index');
 });

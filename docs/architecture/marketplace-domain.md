@@ -613,7 +613,136 @@ Paymob file was read or modified), but is unaffected in principle since marketpl
 flows entirely through `cart_items.additional`/`order_items.additional`, which Paymob's
 integration does not touch.
 
-## 18. Rejected alternatives
+## 18. Vendor Order Management & Fulfillment Foundation (Phase 11)
+
+A **filtered view of the canonical Bagisto `orders`/`order_items`**, not a second order
+system. No new `vendor_orders`/`marketplace_orders` table was created; everything in this
+section is read-only query composition over tables that already existed after Phase 10.
+
+### Ownership source of truth
+
+Vendor ownership of an order item is determined **solely** by the historical
+`order_items.additional.marketplace.vendor_id` snapshot written at checkout time (Phase 10)
+— never by `product_id` (one product can have offers from multiple vendors) and never by a
+live `VendorProduct` lookup (the offer may since have been edited or deleted). This mirrors
+Phase 10's own purchase-time-snapshot principle applied to a new read path.
+
+Ownership is at the **order-item level**, not the order level. A single Bagisto `Order` may
+contain items from several vendors; a vendor's portal view returns only that vendor's own
+items within any given order — confirmed with a real 3-item/2-vendor order (`order_id=1`,
+items `#1`/`#3` → Vendor A, item `#2` → Vendor B): Vendor A's order-detail HTTP response
+contains `XA-SKU`/`YA-SKU` and never `XB-SKU`; Vendor B's contains only `XB-SKU`.
+
+### Query mechanics
+
+`VendorOrderService` (`packages/Webkul/Marketplace/src/Services/VendorOrderService.php`)
+filters directly in SQL using Laravel's JSON-path query syntax —
+`->where('order_items.additional->marketplace->vendor_id', $vendor->id)` — confirmed (before
+writing any controller/view code) to translate correctly to MySQL's
+`JSON_UNQUOTE(JSON_EXTRACT(...))` and match real rows. `paginateVendorOrders()` groups by
+order and counts *that vendor's* items only (`vendor_item_count`); `getVendorOrderItems()`
+returns only that vendor's own `OrderItem` rows for a specific order; `vendorHasItemsInOrder()`
+is the authorization gate for the detail page; `vendorOwnsOrderItem()` is a single-item
+ownership check available for any future write action.
+
+### Authorization
+
+Enforced at the **query/service layer**, not via `Order::find($id)` followed by a PHP-level
+ownership check — the vendor-order-detail query itself only ever returns rows matching the
+vendor's `additional.marketplace.vendor_id`, so there is no code path that can accidentally
+leak another vendor's item data even if a future refactor forgets an `if`.
+
+`OrderController` (`Http/Controllers/Vendor/OrderController.php`) reuses the exact same
+building blocks established in Phases 6-9: `EnsureVendorContext` (route middleware, proves
+active membership in the URL's `{vendor:slug}`) + `$this->authorize('view', $vendor)`
+(`VendorPolicy`, same gate already used by the dashboard/profile/team "read" actions — no
+new policy ability was added since no new permission tier is needed for read-only order
+visibility). A **second** guard, `assertVendorHasItemsInOrder()`, closes the gap
+`EnsureVendorContext` cannot: proving membership in the vendor proves nothing about whether
+*this specific order* contains any of that vendor's items — an order the vendor has zero
+items in 404s, it does not render an empty/misleading page (same `assertOwnedByVendor`-style
+pattern established for `VendorProduct` in Phase 7, applied here to orders).
+
+### Order status / fulfillment state decision
+
+**No new status field was added, anywhere.** Bagisto's `orders.status` remains a single
+global value representing the whole order and is never written to by any marketplace code —
+multi-vendor orders are never force-set to a status that would misrepresent another vendor's
+items. The task's own escape hatch ("introduce marketplace-specific fulfillment state at the
+OrderItem/vendor scope only if the existing Bagisto model cannot safely represent it") was
+evaluated and found **not necessary**: `order_items` already carries independent, per-item
+progress counters — `qty_ordered`, `qty_shipped`, `qty_invoiced`, `qty_canceled`,
+`qty_refunded`, and a computed `qty_to_ship` (`OrderItem::canShip()` already checks
+`qty_to_ship > 0` per item, with zero coupling to sibling items in the same order). These are
+exactly what "vendor A has shipped, vendor B hasn't" needs to be representable, and they cost
+zero new schema. The vendor order-detail view surfaces these existing counters per item.
+Because no vendor-scoped shipment action exists yet (see below), every marketplace order
+item's counters simply remain at their Phase-10 defaults (`qty_shipped = 0`) until a future
+phase adds vendor-initiated fulfillment — this is accurately reflected in the UI rather than
+inventing a fake "shipped" state.
+
+### Shipment — deferred, with justification
+
+Vendor-scoped shipment **creation** was investigated and is **explicitly deferred**, not
+implemented. Inspection of `Webkul\Admin\Http\Controllers\Sales\ShipmentController` and the
+`shipments`/`shipment_items` schema found shipment creation tightly coupled to
+**platform-level, admin-managed `inventory_sources`**: every shipment requires a
+`shipment.source` (an `inventory_source_id`), and `isInventoryValidate()` checks the
+requested quantity against `product->inventories()->where('inventory_source_id', ...)->sum('qty')`
+— core Bagisto's own warehouse/stock-location concept, not anything a `Vendor` owns or
+controls in this codebase (same boundary already established in Section 2: vendor identity
+is completely independent of `product_inventories`).
+
+Letting a vendor create a shipment would therefore require either (a) exposing core
+inventory-source selection to vendors — leaking platform operational/warehouse structure to
+a tenant that has no relationship to it, or (b) building a parallel, vendor-only shipment
+quantity/validation mechanism that duplicates `ShipmentController::isInventoryValidate()`'s
+logic outside the core flow. Both were rejected: (a) is a wrong trust/ownership boundary, and
+(b) is exactly the "uncontrolled replacement" the task warned against building instead of a
+documented limitation. No shipment-creation route, controller action, or view was added in
+this phase. The vendor order-detail page explicitly tells the vendor that shipment creation
+is not yet available from the portal (`fulfillment-deferred` lang key) rather than silently
+omitting the capability.
+
+### Inventory
+
+No change from Phase 10: `VendorProduct.quantity` continues to be validated (at add-to-cart,
+at cart-quantity-update, at checkout) but never decremented by anything in this phase. Core
+Bagisto's own inventory deduction (via `OrderItemRepository::manageInventory()` at order
+creation, and via core `Shipment` creation) is completely unmodified and untouched, since no
+vendor-facing shipment action was added that could call it.
+
+### Admin oversight
+
+A new read-only `/admin/marketplace/vendor-orders` page
+(`Http/Controllers/Admin/VendorOrderController.php`) lists every marketplace order item
+across all vendors (vendor name/SKU/price via the item's own historical snapshot, never a
+live `Vendor`/`VendorProduct` lookup) with a link back to the **existing** admin order view.
+Phase 10 already added a read-only marketplace panel to that order view
+(`bagisto.admin.sales.order.list.item.after`) — this phase does not duplicate or modify it;
+the new page is purely an additional cross-vendor index, confirmed via regression test to
+still render the Phase 10 panel unchanged.
+
+### B2B compatibility
+
+Untouched. `orders.company_id` still does not exist (confirmed again by inspection); vendor
+order ownership and B2B company context remain two independent, non-overlapping facts, as
+established in Phase 10.
+
+### Route-naming gotcha (new, worth recording for future phases)
+
+Concord auto-registers an **explicit route-model-binding resolver for every Concord-registered
+model, keyed by the route parameter's name** (not by the controller method's type-hint). Since
+`Order` is Concord-registered and the route parameter was initially named `{order}`,
+Laravel/Concord substituted a resolved `Order` instance into that slot even though the
+controller method declared `int $orderId` — raising a `TypeError` at runtime (caught by HTTP
+testing, not by `php -l`/static review). Fixed by naming the route parameter `{orderId}`
+instead of `{order}`, which no longer matches Concord's registered binder key. This refines
+the Phase 6 Concord route-binding note (which only covered the `{model:slug}` case): **any**
+route parameter whose name matches a Concord model's short name can trigger this, regardless
+of whether the controller actually wants an implicit model binding.
+
+## 19. Rejected alternatives
 
 - **Vendor = Company subtype** — rejected outright per explicit instruction; also wrong
   domain modeling (buyer organization ≠ seller organization).
@@ -667,23 +796,42 @@ integration does not touch.
 - **(Phase 10) Order splitting / `marketplace_orders` / `vendor_orders` tables** — explicitly
   out of scope per the task; one Bagisto order with vendor-aware order items is the full
   extent of this phase.
+- **(Phase 11) `Order::find($id)` + PHP-level ownership check** — rejected in favor of
+  scoping the ownership check into the query itself (`additional->marketplace->vendor_id`
+  WHERE clause); a PHP-level `if ($item->vendor_id !== $vendor->id) abort(403)` pattern was
+  avoided so there is no code path that returns full unfiltered data and merely hides it.
+- **(Phase 11) A new order/order-item status field for vendor fulfillment** — rejected;
+  `order_items.qty_ordered`/`qty_shipped`/`qty_to_ship` (already present, already per-item)
+  fully represent "vendor A shipped, vendor B hasn't" without any new schema.
+- **(Phase 11) Vendor-initiated shipment creation reusing or duplicating core
+  `ShipmentController`** — deferred, not rejected outright; see Section 18's "Shipment —
+  deferred, with justification". Reuse was blocked by `inventory_sources` being a
+  platform-level concept with no vendor ownership boundary; duplicating the core
+  quantity-validation logic in a vendor-only path was rejected as an "uncontrolled
+  replacement".
+- **(Phase 11) `vendor_orders`/`marketplace_orders` tables** — explicitly out of scope per
+  the task; every vendor order view in this phase is a live query over the existing
+  `orders`/`order_items` tables.
 
-## Deferred (explicitly NOT built in Phase 5, 6, 7, 8, 9, or 10)
+## Deferred (explicitly NOT built in Phase 5, 6, 7, 8, 9, 10, or 11)
 
-Vendor order management, vendor fulfillment, order splitting (`marketplace_orders`/
-`vendor_orders` tables), vendor-specific shipping, commission, settlement, payouts, vendor
-notifications beyond the existing lifecycle set, vendor pricing precedence/composition
-engine, RFQ marketplace integration, independent PO, GraphQL marketplace API, ownership
-transfer, full public vendor storefront/profile pages, marketplace-specific price sorting
-(current listing sorts by name; if lowest-price sorting is added later it must use the same
-`MIN(price)` aggregate already used for display), inventory reservation/atomic decrement
-(neither at add-to-cart nor at order-time — `VendorProduct.quantity` is validated but never
-decremented; two concurrent checkouts against the same limited quantity are not resolved
-atomically), vendor-identity display inside Bagisto's own storefront cart/checkout UI (only
-the admin order view and the Marketplace's own product detail page show it),
-`Virtual`/`Downloadable`/`Bundle`/`Booking`/`Grouped` vendor-offer cart/order support (only
-`Simple` was extended), end-to-end Paymob/live-payment marketplace order testing, final
-security/regression/performance E2E testing.
+Vendor-initiated shipment/fulfillment actions (creation deferred — see Section 18), order
+splitting (`marketplace_orders`/`vendor_orders` tables), vendor-specific shipping, commission,
+settlement, payouts, vendor notifications beyond the existing lifecycle set, vendor pricing
+precedence/composition engine, RFQ marketplace integration, independent PO, GraphQL
+marketplace API, ownership transfer, full public vendor storefront/profile pages,
+marketplace-specific price sorting (current listing sorts by name; if lowest-price sorting is
+added later it must use the same `MIN(price)` aggregate already used for display), inventory
+reservation/atomic decrement (neither at add-to-cart, at order-time, nor at shipment-time,
+since no vendor-facing shipment action exists yet — `VendorProduct.quantity` is validated but
+never decremented; two concurrent checkouts against the same limited quantity are not
+resolved atomically), vendor-identity display inside Bagisto's own storefront cart/checkout UI
+(only the admin order view, the vendor portal's own order pages, and the Marketplace's own
+product detail page show it), `Virtual`/`Downloadable`/`Bundle`/`Booking`/`Grouped`
+vendor-offer cart/order support (only `Simple` was extended), end-to-end Paymob/live-payment
+marketplace order testing, final security/regression/performance E2E testing, refunds/RMA
+integration with vendor ownership, a dedicated `VendorOrderPolicy` class (reused existing
+`VendorPolicy::view` instead — no new permission tier was needed for read-only visibility).
 
 Phase 6 resolved: vendor onboarding HTTP flow, admin vendor lifecycle management HTTP,
 Vendor Portal foundation (dashboard/profile/team), vendor-scoped HTTP authorization
@@ -709,4 +857,12 @@ purchase-time vendor snapshot (name/SKU/price, immune to later `VendorProduct` c
 multi-vendor single-order preservation (no splitting), checkout-time re-validation of
 vendor/offer eligibility reusing the existing `Cart::validateItems()` extension point,
 read-only admin order-item marketplace panel via `view_render_event` (no core file edited).
+
+Phase 11 resolved: vendor-scoped order visibility (list + detail) as a filtered,
+query-level-authorized view of the canonical `orders`/`order_items` (zero new tables),
+order-item-level ownership derived solely from the Phase 10 historical snapshot, verified
+multi-vendor isolation on a real shared order, a dedicated read-only admin cross-vendor
+oversight page, and an explicit, justified decision to defer vendor-initiated shipment
+creation (core shipment architecture is coupled to platform-level inventory sources, not
+vendor-owned) rather than fake or duplicate it.
 

@@ -41,5 +41,10 @@ return [
         'name' => 'marketplace::app.admin.acl.vendor-products',
         'route' => 'marketplace.admin.vendor-products.index',
         'sort' => 6,
+    ], [
+        'key' => 'marketplace.vendor_orders',
+        'name' => 'marketplace::app.admin.acl.vendor-orders',
+        'route' => 'marketplace.admin.vendor-orders.index',
+        'sort' => 7,
     ],
 ];

@@ -11,6 +11,7 @@ return [
             'suspend' => 'Suspend',
             'reactivate' => 'Reactivate',
             'vendor-products' => 'Vendor Products',
+            'vendor-orders' => 'Vendor Orders',
         ],
         'vendors' => [
             'index' => [
@@ -27,6 +28,12 @@ return [
         'vendor-products' => [
             'index' => [
                 'title' => 'Vendor Products',
+            ],
+        ],
+        'vendor-orders' => [
+            'index' => [
+                'title' => 'Vendor Orders',
+                'empty' => 'No marketplace order items yet.',
             ],
         ],
         'order-item' => [
@@ -60,6 +67,27 @@ return [
             'edit-btn' => 'Edit',
             'save-btn' => 'Save Offer',
             'remove-btn' => 'Remove',
+        ],
+        'orders' => [
+            'title' => 'Orders',
+            'order-id' => 'Order #',
+            'customer' => 'Customer',
+            'status' => 'Status',
+            'your-items' => 'Your Items',
+            'date' => 'Date',
+            'view-btn' => 'View',
+            'empty' => 'You have no orders yet.',
+            'detail-title' => 'Order',
+            'back-btn' => 'Back to Orders',
+            'order-status' => 'Order Status',
+            'shipping-address' => 'Shipping Address',
+            'item-name' => 'Item',
+            'item-sku' => 'SKU',
+            'vendor-price' => 'Your Price',
+            'qty-ordered' => 'Ordered',
+            'qty-shipped' => 'Shipped',
+            'qty-to-ship' => 'Remaining',
+            'fulfillment-deferred' => 'Shipment creation from the vendor portal is not yet available. Contact the store admin to arrange fulfillment.',
         ],
     ],
     'shop' => [

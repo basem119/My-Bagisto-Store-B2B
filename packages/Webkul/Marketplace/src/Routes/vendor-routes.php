@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Webkul\Marketplace\Http\Controllers\Vendor\DashboardController;
 use Webkul\Marketplace\Http\Controllers\Vendor\OnboardingController;
+use Webkul\Marketplace\Http\Controllers\Vendor\OrderController;
 use Webkul\Marketplace\Http\Controllers\Vendor\ProductController;
 use Webkul\Marketplace\Http\Controllers\Vendor\ProfileController;
 use Webkul\Marketplace\Http\Controllers\Vendor\TeamController;
@@ -42,6 +43,11 @@ Route::prefix('vendor')->middleware(['web', 'theme', 'locale', 'currency', 'cust
             Route::get('{vendorProduct}/edit', 'edit')->name('marketplace.vendor.products.edit');
             Route::put('{vendorProduct}', 'update')->name('marketplace.vendor.products.update');
             Route::delete('{vendorProduct}', 'destroy')->name('marketplace.vendor.products.destroy');
+        });
+
+        Route::controller(OrderController::class)->prefix('orders')->group(function () {
+            Route::get('', 'index')->name('marketplace.vendor.orders.index');
+            Route::get('{orderId}', 'show')->name('marketplace.vendor.orders.show');
         });
     });
 });
