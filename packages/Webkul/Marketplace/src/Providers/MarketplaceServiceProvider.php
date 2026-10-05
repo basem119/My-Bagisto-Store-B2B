@@ -2,12 +2,16 @@
 
 namespace Webkul\Marketplace\Providers;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Webkul\Marketplace\Http\Middleware\EnsureVendorContext;
+use Webkul\Marketplace\Listeners\RevalidateVendorOfferQuantity;
 use Webkul\Marketplace\Models\Vendor;
 use Webkul\Marketplace\Policies\VendorPolicy;
+use Webkul\Marketplace\Type\MarketplaceAwareSimple;
+use Webkul\Product\Type\Simple;
 
 /**
  * Registers the vendor-scoped authorization boundary, routes, views and ACL.
@@ -22,6 +26,15 @@ class MarketplaceServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(dirname(__DIR__).'/Config/admin/acl.php', 'acl');
+
+        /**
+         * Same container-rebinding pattern B2B Suite itself uses for
+         * ProductRepository/Customer (see B2BSuiteManager) — never edits
+         * Webkul\Product\Type\Simple. Only affects cart-item identity/price
+         * when `vendor_product_id` is present in the submitted data (see
+         * MarketplaceAwareSimple); every other Simple product is unaffected.
+         */
+        $this->app->bind(Simple::class, MarketplaceAwareSimple::class);
     }
 
     public function boot(): void
@@ -35,5 +48,8 @@ class MarketplaceServiceProvider extends ServiceProvider
         $this->loadViewsFrom(dirname(__DIR__).'/Resources/views', 'marketplace');
 
         $this->loadTranslationsFrom(dirname(__DIR__).'/Resources/lang', 'marketplace');
+
+        Event::listen('checkout.cart.update.before', RevalidateVendorOfferQuantity::class);
     }
 }
+

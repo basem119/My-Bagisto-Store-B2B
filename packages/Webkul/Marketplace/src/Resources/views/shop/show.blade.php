@@ -26,6 +26,24 @@
 
         <h2 class="mb-4 text-xl font-medium">@lang('marketplace::app.shop.show.offers-title')</h2>
 
+        @if (session('success'))
+            <div class="mb-4 rounded bg-green-50 p-4 text-green-700">{{ session('success') }}</div>
+        @endif
+
+        @if (session('error'))
+            <div class="mb-4 rounded bg-red-50 p-4 text-red-700">{{ session('error') }}</div>
+        @endif
+
+        @if ($errors->any())
+            <div class="mb-4 rounded bg-red-50 p-4 text-red-700">
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         @if ($offers->isEmpty())
             <p>@lang('marketplace::app.shop.show.no-offers')</p>
         @else
@@ -36,6 +54,7 @@
                         <th class="border-b p-2">@lang('marketplace::app.shop.show.vendor-sku')</th>
                         <th class="border-b p-2">@lang('marketplace::app.shop.show.price')</th>
                         <th class="border-b p-2">@lang('marketplace::app.shop.show.quantity')</th>
+                        <th class="border-b p-2"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -45,6 +64,15 @@
                             <td class="border-b p-2">{{ $offer->vendor_sku }}</td>
                             <td class="border-b p-2">{{ core()->formatPrice($offer->price) }}</td>
                             <td class="border-b p-2">{{ $offer->quantity }}</td>
+                            <td class="border-b p-2">
+                                <form method="POST" action="{{ route('marketplace.shop.cart.add') }}" class="flex items-center gap-2">
+                                    @csrf
+                                    <input type="hidden" name="vendor_product_id" value="{{ $offer->id }}">
+                                    <input type="hidden" name="product_id" value="{{ $product->id }}">
+                                    <input type="number" name="quantity" value="1" min="1" max="{{ $offer->quantity }}" class="w-16 rounded border p-1">
+                                    <button type="submit" class="primary-button">@lang('marketplace::app.shop.show.add-to-cart-btn')</button>
+                                </form>
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -52,3 +80,4 @@
         @endif
     </div>
 </x-shop::layouts>
+

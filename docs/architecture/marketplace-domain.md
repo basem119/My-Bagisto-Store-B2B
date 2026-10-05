@@ -405,7 +405,99 @@ No dedicated public vendor profile page was built — only `vendor.name` is surf
 next to each offer on the product detail page, satisfying "a simple vendor identity/display
 is sufficient" without building the explicitly-deferred full vendor storefront.
 
-## 16. Rejected alternatives
+## 16. Multi-Vendor Cart (Phase 9)
+
+Adds `Services/MarketplaceCartService` (resolve/validate a vendor offer, delegate persistence
+to Bagisto's own `Cart` facade — never a second cart system), `Type/MarketplaceAwareSimple`,
+`Listeners/RevalidateVendorOfferQuantity`, one new route (`POST /marketplace/cart/add`), and
+an "Add to Cart" form per offer row on the Phase 8 product detail page. **No migration** —
+`cart_items.additional` (a pre-existing JSON column, confirmed unused by anything
+marketplace-relevant) is the extension point.
+
+### Where the selected offer is stored
+
+`cart_items.additional` (JSON) gains three keys when a line represents a marketplace offer:
+`vendor_product_id`, `vendor_id`, `product_id`. A normal, non-marketplace cart item (B2C or
+B2B) simply never has these keys — `additional` is already nullable/free-form, so nothing
+about the column's existing meaning for other product types changes.
+
+### Cart item identity (the core risk this phase had to solve)
+
+Bagisto decides whether two "add to cart" calls merge into one line or become two separate
+lines via `ProductType::compareOptions()` — for `Simple` (and therefore for every concrete
+product a `VendorProduct` can be attached to; Phase 7 already rejects configurable *parent*
+offers) the stock implementation only compares `product_id`/`parent_id`. Verified directly:
+two different vendors' offers of the same product would otherwise silently merge into one
+line with an accumulated quantity and whichever price happened to win the merge — exactly
+the bug this phase was told to prevent.
+
+**Fix:** `Webkul\Marketplace\Type\MarketplaceAwareSimple extends Simple`, overriding
+`compareOptions()` to also require `vendor_product_id` equality before falling through to the
+parent check, bound over the container (`$this->app->bind(Simple::class,
+MarketplaceAwareSimple::class)` in `MarketplaceServiceProvider::register()`) — the exact same
+"rebind over the container" pattern B2B Suite itself already uses for `ProductRepository`/
+`Customer`. `Webkul\Product\Type\Simple` is never edited. When neither side's data carries
+`vendor_product_id` (every non-marketplace add), the comparison degrades to `null === null`
+and falls through to the unmodified parent behavior — verified with an explicit test adding a
+normal product immediately after two vendor-offer adds.
+
+### Vendor price (and a second risk this phase had to solve)
+
+`VendorProduct.price` is written into `base_price`/`price` (converted) during
+`prepareForCart()` — but `Cart::collectTotals()` independently calls
+`ProductType::validateCartItem()` on every cart read/update, and the stock implementation
+unconditionally **recomputes** the price from `getFinalPrice()` (Bagisto's own base/
+customer-group/catalog-rule price), silently overwriting the vendor's price the very next
+time the cart page loaded. `MarketplaceAwareSimple::validateCartItem()` skips this
+recomputation when `additional.vendor_product_id` is present (still runs the inactive-item
+check), so the vendor's price survives every reload — verified by re-fetching the cart fresh
+after `collectTotals()` ran and confirming the price was still the vendor's, not Bagisto's own.
+
+### Quantity validation (two separate call sites)
+
+1. **Add** — `MarketplaceCartService::assertSufficientQuantity()` sums whatever quantity of
+   this *same* `vendor_product_id` is already in the cart, adds the newly requested quantity,
+   and rejects if the total exceeds `VendorProduct.quantity`, before `Cart::addProduct()` is
+   ever called.
+2. **Update** (changing quantity on an existing cart line, Bagisto's existing `/cart/update`
+   flow, shared by every item) — `Listeners\RevalidateVendorOfferQuantity`, hooked on the
+   existing `checkout.cart.update.before` event, re-checks the new quantity against the
+   *current* `VendorProduct.quantity` and throws to abort the update if it's exceeded.
+
+Both are entirely independent of, and do not replace, Bagisto's own core inventory check
+(`haveSufficientQuantity()`/`product_inventories`) — that still runs unmodified inside
+`parent::prepareForCart()`. `product_inventories.vendor_id` is never read by this phase,
+consistent with the Phase 6.x audit.
+
+### B2B Company cart coexistence
+
+`cart.company_id` is untouched — confirmed via direct inspection after an HTTP add-to-cart
+request: the column exists, is nullable, and remains whatever B2B Suite's own existing logic
+sets it to (`null` for a guest cart in this test, populated independently by B2B Suite for a
+company customer's cart). Nothing in Phase 9 reads or writes `cart.company_id`, and no
+Company ↔ Vendor relationship was introduced.
+
+### Security (all enforced server-side, in `MarketplaceCartService::resolveEligibleOffer()`)
+
+The submitted `price` is never read at all (not even accepted as a parameter). A submitted
+`vendor_product_id` is re-resolved from the database and its `product_id` is compared against
+the submitted/expected `product_id` — a mismatch (spoofed pairing) is rejected before any cart
+mutation. An inactive offer, a non-active vendor, or a nonexistent `vendor_product_id` are all
+rejected the same way. Verified with real HTTP requests (not just unit-level calls).
+
+### Explicitly deferred (not solved in Phase 9)
+
+Pricing precedence (vendor vs. company-catalog vs. RFQ price — `VendorProduct.price` is simply
+what gets charged, full stop, for a marketplace line), checkout/order integration, order
+splitting, inventory reservation/decrement (`VendorProduct.quantity` is never decremented by
+adding to cart — only validated), vendor-identity display inside Bagisto's own Vue cart/
+checkout UI (the cart page is otherwise completely unmodified; vendor name is only shown on
+the Marketplace's own product detail page), `Virtual`/`Downloadable`/`Bundle`/`Booking`/
+`Grouped` product types (only `Simple` was overridden — if a vendor ever offers one of those
+types, the same merge/price risks this phase fixed for `Simple` would still apply there;
+flagged as a known gap, not a silent one).
+
+## 17. Rejected alternatives
 
 - **Vendor = Company subtype** — rejected outright per explicit instruction; also wrong
   domain modeling (buyer organization ≠ seller organization).
@@ -429,15 +521,30 @@ is sufficient" without building the explicitly-deferred full vendor storefront.
   in favor of Laravel's native `{vendor:slug}` route-model-binding (see Section 11); the
   middleware now trusts the already-resolved `Vendor` instance instead of re-querying by a
   raw slug string pulled off the route.
+- **(Phase 9) A `marketplace_cart_items` table** — rejected; `cart_items.additional` (an
+  existing, unused-by-anyone-else JSON column) already satisfies every requirement
+  (survives persistence/reload, works for guest and customer carts, coexists with
+  `cart.company_id`) with zero schema change.
+- **(Phase 9) Editing `Webkul\Product\Type\Simple` directly** — rejected; would be a global,
+  unscoped behavior change to every Simple product in the application (B2C and B2B alike).
+  Container-rebinding a subclass (`MarketplaceAwareSimple`) confines both overrides to
+  exactly the marketplace-add case (guarded by `vendor_product_id` presence) and mirrors a
+  pattern already established in this codebase by B2B Suite itself.
+- **(Phase 9) A global "vendor price always wins" pricing rule** — not introduced; the price
+  substitution in `MarketplaceAwareSimple` only ever applies to a cart line that was created
+  through the marketplace add-to-cart flow (carries `vendor_product_id`). A normal product
+  added via Bagisto's own `/cart/add` is priced exactly as before.
 
-## Deferred (explicitly NOT built in Phase 5, 6, 7, or 8)
+## Deferred (explicitly NOT built in Phase 5, 6, 7, 8, or 9)
 
-Vendor pricing precedence/composition engine, multi-vendor cart, cart vendor selection,
-marketplace checkout, parent/vendor orders, fulfillment, RFQ marketplace integration,
-independent PO, commissions, settlements, payouts, GraphQL marketplace API, ownership
-transfer, full public vendor storefront/profile pages, marketplace-specific price sorting
-(deferred — current listing sorts by name; if lowest-price sorting is added later it must
-use the same `MIN(price)` aggregate already used for display, never a raw joined row), final
+Vendor pricing precedence/composition engine, marketplace checkout, parent/vendor order
+splitting, fulfillment, RFQ marketplace integration, independent PO, commissions,
+settlements, payouts, GraphQL marketplace API, ownership transfer, full public vendor
+storefront/profile pages, marketplace-specific price sorting (current listing sorts by name;
+if lowest-price sorting is added later it must use the same `MIN(price)` aggregate already
+used for display), inventory reservation/decrement on add-to-cart, vendor-identity display
+inside Bagisto's own cart/checkout UI, `Virtual`/`Downloadable`/`Bundle`/`Booking`/`Grouped`
+vendor-offer cart support (only `Simple` was extended in Phase 9), final
 security/regression/performance/payment E2E testing.
 
 Phase 6 resolved: vendor onboarding HTTP flow, admin vendor lifecycle management HTTP,
@@ -451,3 +558,9 @@ enforcement.
 Phase 8 resolved: public marketplace product discovery/listing, product detail page with all
 eligible vendor offers, product deduplication across multiple vendor offers, category/vendor/
 search filtering, pagination.
+
+Phase 9 resolved: marketplace offer → Bagisto cart integration (add-to-cart entry point,
+cart-item identity distinguishing different vendors' offers of the same product, vendor price
+surviving `prepareForCart()` AND `collectTotals()`/`validateCartItem()`, add- and
+update-quantity revalidation against `VendorProduct.quantity`, server-side vendor/offer/price
+spoofing prevention).

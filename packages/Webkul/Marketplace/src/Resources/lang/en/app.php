@@ -70,6 +70,7 @@ return [
             'vendor-sku' => 'Vendor SKU',
             'price' => 'Price',
             'quantity' => 'Available Quantity',
+            'add-to-cart-btn' => 'Add to Cart',
         ],
     ],
 ];

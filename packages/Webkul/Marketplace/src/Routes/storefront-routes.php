@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Webkul\Marketplace\Http\Controllers\Shop\CartController;
 use Webkul\Marketplace\Http\Controllers\Shop\MarketplaceController;
 
 /**
@@ -12,4 +13,12 @@ Route::prefix('marketplace')->middleware(['web', 'theme', 'locale', 'currency'])
     Route::get('', [MarketplaceController::class, 'index'])->name('marketplace.shop.index');
 
     Route::get('products/{urlKey}', [MarketplaceController::class, 'show'])->name('marketplace.shop.products.show');
+
+    /**
+     * No `customer` middleware here either — mirrors Bagisto's own generic
+     * `/cart/add`, which allows guest carts. Guard is inside the service
+     * (vendor/offer/quantity validation), not the route.
+     */
+    Route::post('cart/add', [CartController::class, 'store'])->name('marketplace.shop.cart.add');
 });
+
