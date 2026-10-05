@@ -29,6 +29,13 @@ return [
                 'title' => 'Vendor Products',
             ],
         ],
+        'order-item' => [
+            'title' => 'Marketplace Offer',
+            'vendor' => 'Vendor',
+            'vendor-sku' => 'Vendor SKU',
+            'vendor-offer' => 'Vendor Offer',
+            'purchase-price' => 'Purchase Vendor Price',
+        ],
     ],
     'vendor' => [
         'onboarding' => [

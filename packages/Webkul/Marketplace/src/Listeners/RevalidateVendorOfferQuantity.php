@@ -12,14 +12,14 @@ use Webkul\Marketplace\Models\VendorProduct;
  * NEW requested value and fires `checkout.cart.update.before` before
  * persisting it. For marketplace items this is the only place that can
  * re-validate the new quantity against the vendor's current offer quantity;
- * non-marketplace items (no `vendor_product_id` in `additional`) are
+ * non-marketplace items (no `marketplace` key in `additional`) are
  * untouched.
  */
 class RevalidateVendorOfferQuantity
 {
     public function handle(CartItem $item): void
     {
-        $vendorProductId = $item->additional['vendor_product_id'] ?? null;
+        $vendorProductId = $item->additional['marketplace']['vendor_product_id'] ?? null;
 
         if (! $vendorProductId) {
             return;

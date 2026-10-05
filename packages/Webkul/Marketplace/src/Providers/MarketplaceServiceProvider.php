@@ -50,6 +50,15 @@ class MarketplaceServiceProvider extends ServiceProvider
         $this->loadTranslationsFrom(dirname(__DIR__).'/Resources/lang', 'marketplace');
 
         Event::listen('checkout.cart.update.before', RevalidateVendorOfferQuantity::class);
+
+        /**
+         * Read-only marketplace panel on the existing admin order-item
+         * display (Bagisto's own extension hook — no core Blade file is
+         * touched). No-op for any order item without marketplace metadata.
+         */
+        Event::listen('bagisto.admin.sales.order.list.item.after', function ($viewRenderEventManager) {
+            $viewRenderEventManager->addTemplate('marketplace::admin.order-items.marketplace-info');
+        });
     }
 }
 

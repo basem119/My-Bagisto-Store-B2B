@@ -497,7 +497,123 @@ the Marketplace's own product detail page), `Virtual`/`Downloadable`/`Bundle`/`B
 types, the same merge/price risks this phase fixed for `Simple` would still apply there;
 flagged as a known gap, not a silent one).
 
-## 17. Rejected alternatives
+> **(Phase 10 update)** The flat `additional.vendor_product_id`/`vendor_id` keys described
+> above were nested under `additional.marketplace` in Phase 10 (adding `vendor_sku` and
+> `vendor_price` snapshot fields) — see Section 17. This is an additive refinement of the
+> shape, not a change to the storage mechanism (`cart_items.additional` is still the same
+> pre-existing JSON column).
+
+## 17. Checkout & Order Boundary (Phase 10)
+
+Takes the vendor-aware cart from Phase 9 through Bagisto's existing, **unmodified** checkout
+and produces a vendor-aware order — no second checkout, no second order system, no order
+splitting.
+
+### The discovered Cart → Order flow
+
+`OnepageController::storeOrder()` calls `Cart::collectTotals()`, then builds
+`$data = (new OrderResource($cart))->jsonSerialize()`, then
+`OrderRepository::create($data)`. `OrderResource`/`OrderItemResource` read directly off the
+already-persisted `Cart`/`CartItem` rows — **no new client input is accepted at order-creation
+time**. Critically, `OrderItemResource::toArray()` already does
+`'additional' => array_merge($this->resource->additional ?? [], [...])` — `cart_items.additional`
+is copied into `order_items.additional` **verbatim, with zero Phase 10 code required** for that
+copy to happen. `order_items.additional` is the same pre-existing nullable JSON column type as
+`cart_items.additional` (confirmed by inspecting the migration before writing anything) — no
+migration was needed.
+
+### Purchase-time snapshot (why the shape changed from Phase 9)
+
+Phase 9's `additional` only carried `vendor_product_id`/`vendor_id`/`product_id` — enough to
+trace an order item back to an offer, but **not** enough to survive the offer changing later
+(`vendor_sku` and `vendor_name` are mutable; relying on a live `VendorProduct`/`Vendor` lookup
+after the fact would make historical orders show today's values, not what was purchased).
+`MarketplaceAwareSimple::prepareForCart()` now additionally snapshots `vendor_name` and
+`vendor_sku` into `additional.marketplace` at add-to-cart time (price was already correctly
+sourced from `VendorProduct.price` since Phase 9 — `vendor_price` is stored explicitly
+alongside it purely so order-processing code never has to infer which price column is "the
+vendor's"). Because this snapshot is taken once, at add-to-cart time, and never re-read from
+`VendorProduct` afterward, changing `VendorProduct.price`/`vendor_sku` after an order exists
+has **zero effect** on that order — verified explicitly: changed a purchased offer's price to
+999 and SKU to a new value after order creation, re-fetched the order, confirmed it still
+showed the original 300/XA-SKU.
+
+### Order price — never recalculated
+
+`order_items.price`/`base_price` are copied straight from `cart_items.price`/`base_price` by
+the stock `OrderItemResource` (unmodified) — exactly the cart's checkout-time price, which for
+a marketplace item is already the vendor's price (Phase 9). Phase 10 adds no price computation
+of its own anywhere in the order-creation path.
+
+### Pre-order validation — reused, not duplicated
+
+`Cart::collectTotals()` calls `Cart::validateItems()`, which calls
+`ProductType::validateCartItem()` on every item and **removes** any item that reports itself
+inactive — this is Bagisto's own existing "strip stale items before checkout" mechanism
+(already relied upon in Phase 9 to skip the vendor-price recomputation). Phase 10 extends
+`MarketplaceAwareSimple::validateCartItem()` to also re-check, at the moment checkout runs,
+that the `VendorProduct` still exists and is active, its `Vendor` is still active, and the
+cart quantity does not exceed the vendor's current `VendorProduct.quantity` — flagging the
+item inactive (and therefore removed from the cart before `OrderResource` ever sees it) if
+any of those no longer hold. **No new checkout validation step, event listener, or service
+was added for this** — it reuses the exact extension point `Cart::validateItems()` already
+calls. Verified explicitly: suspended a vendor after adding their offer to cart, called
+`Cart::collectTotals()` (what `storeOrder()` calls first), confirmed the item was stripped and
+the cart left empty.
+
+### Multi-vendor order (not split)
+
+A single cart with three marketplace lines (`Product X` from Vendor A, `Product X` from
+Vendor B, `Product Y` from Vendor A) produces **one** Bagisto order with **three** order
+items, each independently carrying its own `additional.marketplace` snapshot — verified
+explicitly, including the same-product-different-vendor case (both order items correctly
+reference `product_id` = Product X, with different `vendor_id`/`vendor_sku`/price). No
+`marketplace_orders`/`vendor_orders` table was created; order splitting remains a later
+phase's responsibility.
+
+### Admin visibility
+
+A small read-only panel (vendor name/SKU/offer id/purchase price) was added to the existing
+admin order-item display — **without editing the core Admin Blade view file** — by listening
+to Bagisto's own `bagisto.admin.sales.order.list.item.after` `view_render_event` hook (the
+same extension mechanism already used elsewhere in core Bagisto for this exact view) and
+supplying a Marketplace-owned partial. The panel renders nothing for any order item without
+`additional.marketplace` — normal orders are completely unaffected. Verified over real HTTP
+that the panel shows the *original* purchase-time price, not a since-changed one.
+
+### B2B Company order compatibility
+
+`orders` has **no** `company_id` column at all (confirmed by inspecting
+`create_orders_table.php` and `OrderResource::toArray()` — B2B Suite's company context is a
+cart-level concept only, per the Phase 9 finding; it is not itself carried onto the order by
+core Bagisto). Nothing in Phase 10 changes that. A company customer's order and a marketplace
+order item's vendor identity are simply two independent facts that can both be true of the
+same order, exactly as they were two independent facts about the same cart in Phase 9 — no
+Company ↔ Vendor relationship was introduced.
+
+### Inventory (unchanged boundary)
+
+`VendorProduct.quantity` is validated (both at add-to-cart and again at checkout-time, see
+above) but **never decremented** by order creation — confirmed by re-reading the
+`VendorProduct` rows after placing a test order and finding their `quantity` unchanged. Core
+Bagisto's own `product_inventories`/inventory-index deduction (`OrderRepository::manageInventory()`)
+runs completely unmodified and independently, exactly as it does for any non-marketplace
+order. Race conditions between two customers checking out against the same limited
+`VendorProduct.quantity` are **not** resolved atomically in this phase (no row-locking/
+reservation) — explicitly flagged as a limitation for a future marketplace-inventory phase,
+not silently assumed away.
+
+### Payment / Paymob
+
+Not touched. The test order in this phase used Bagisto's core `cashondelivery` payment method
+(ships with Bagisto, requires no external gateway/credentials) specifically so Paymob would
+need zero involvement to validate order creation. Paymob's own checkout flow was not
+re-tested end-to-end in this phase (no regression was introduced that would require it — no
+Paymob file was read or modified), but is unaffected in principle since marketplace metadata
+flows entirely through `cart_items.additional`/`order_items.additional`, which Paymob's
+integration does not touch.
+
+## 18. Rejected alternatives
 
 - **Vendor = Company subtype** — rejected outright per explicit instruction; also wrong
   domain modeling (buyer organization ≠ seller organization).
@@ -534,18 +650,40 @@ flagged as a known gap, not a silent one).
   substitution in `MarketplaceAwareSimple` only ever applies to a cart line that was created
   through the marketplace add-to-cart flow (carries `vendor_product_id`). A normal product
   added via Bagisto's own `/cart/add` is priced exactly as before.
+- **(Phase 10) A dedicated `order_items` snapshot table / new columns** — rejected;
+  `order_items.additional` (already a nullable JSON column, confirmed before writing any
+  code) plus the fact that `OrderItemResource` already copies `cart_items.additional`
+  verbatim meant zero schema change was needed.
+- **(Phase 10) A new checkout-time marketplace validation service/event** — rejected;
+  `Cart::validateItems()` (called by `Cart::collectTotals()`, called at the top of
+  `storeOrder()`) already removes any cart item whose `ProductType::validateCartItem()`
+  reports it inactive. Extending the existing Phase 9 `validateCartItem()` override to also
+  re-check vendor/offer eligibility reused this exact mechanism instead of adding a parallel
+  one.
+- **(Phase 10) Editing the core Admin order-view Blade file** — rejected in favor of
+  Bagisto's own `view_render_event`/`bagisto.admin.sales.order.list.item.after` extension
+  hook, keeping 100% of Phase 10's changes inside `packages/Webkul/Marketplace` (consistent
+  with every prior phase) while still surfacing the marketplace panel on the existing page.
+- **(Phase 10) Order splitting / `marketplace_orders` / `vendor_orders` tables** — explicitly
+  out of scope per the task; one Bagisto order with vendor-aware order items is the full
+  extent of this phase.
 
-## Deferred (explicitly NOT built in Phase 5, 6, 7, 8, or 9)
+## Deferred (explicitly NOT built in Phase 5, 6, 7, 8, 9, or 10)
 
-Vendor pricing precedence/composition engine, marketplace checkout, parent/vendor order
-splitting, fulfillment, RFQ marketplace integration, independent PO, commissions,
-settlements, payouts, GraphQL marketplace API, ownership transfer, full public vendor
-storefront/profile pages, marketplace-specific price sorting (current listing sorts by name;
-if lowest-price sorting is added later it must use the same `MIN(price)` aggregate already
-used for display), inventory reservation/decrement on add-to-cart, vendor-identity display
-inside Bagisto's own cart/checkout UI, `Virtual`/`Downloadable`/`Bundle`/`Booking`/`Grouped`
-vendor-offer cart support (only `Simple` was extended in Phase 9), final
-security/regression/performance/payment E2E testing.
+Vendor order management, vendor fulfillment, order splitting (`marketplace_orders`/
+`vendor_orders` tables), vendor-specific shipping, commission, settlement, payouts, vendor
+notifications beyond the existing lifecycle set, vendor pricing precedence/composition
+engine, RFQ marketplace integration, independent PO, GraphQL marketplace API, ownership
+transfer, full public vendor storefront/profile pages, marketplace-specific price sorting
+(current listing sorts by name; if lowest-price sorting is added later it must use the same
+`MIN(price)` aggregate already used for display), inventory reservation/atomic decrement
+(neither at add-to-cart nor at order-time — `VendorProduct.quantity` is validated but never
+decremented; two concurrent checkouts against the same limited quantity are not resolved
+atomically), vendor-identity display inside Bagisto's own storefront cart/checkout UI (only
+the admin order view and the Marketplace's own product detail page show it),
+`Virtual`/`Downloadable`/`Bundle`/`Booking`/`Grouped` vendor-offer cart/order support (only
+`Simple` was extended), end-to-end Paymob/live-payment marketplace order testing, final
+security/regression/performance E2E testing.
 
 Phase 6 resolved: vendor onboarding HTTP flow, admin vendor lifecycle management HTTP,
 Vendor Portal foundation (dashboard/profile/team), vendor-scoped HTTP authorization
@@ -564,3 +702,11 @@ cart-item identity distinguishing different vendors' offers of the same product,
 surviving `prepareForCart()` AND `collectTotals()`/`validateCartItem()`, add- and
 update-quantity revalidation against `VendorProduct.quantity`, server-side vendor/offer/price
 spoofing prevention).
+
+Phase 10 resolved: vendor-aware order creation (zero-migration — `order_items.additional`
+already existed and `OrderItemResource` already copied `cart_items.additional` through),
+purchase-time vendor snapshot (name/SKU/price, immune to later `VendorProduct` changes),
+multi-vendor single-order preservation (no splitting), checkout-time re-validation of
+vendor/offer eligibility reusing the existing `Cart::validateItems()` extension point,
+read-only admin order-item marketplace panel via `view_render_event` (no core file edited).
+

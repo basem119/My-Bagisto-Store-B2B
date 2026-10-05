@@ -107,7 +107,7 @@ class MarketplaceCartService
         }
 
         return (int) $cart->all_items
-            ->filter(fn ($item) => ($item->additional['vendor_product_id'] ?? null) == $vendorProductId)
+            ->filter(fn ($item) => ($item->additional['marketplace']['vendor_product_id'] ?? null) == $vendorProductId)
             ->sum('quantity');
     }
 }

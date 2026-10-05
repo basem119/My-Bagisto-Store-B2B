@@ -3,6 +3,8 @@
 namespace Webkul\Marketplace\Type;
 
 use Webkul\Checkout\Contracts\CartItem;
+use Webkul\Marketplace\Enums\VendorProductStatus;
+use Webkul\Marketplace\Enums\VendorStatus;
 use Webkul\Marketplace\Models\VendorProduct;
 use Webkul\Product\DataTypes\CartItemValidationResult;
 use Webkul\Product\Type\Simple;
@@ -10,9 +12,24 @@ use Webkul\Product\Type\Simple;
 /**
  * Bound over the core `Simple` type via the container (see
  * MarketplaceServiceProvider::register()) — `Webkul\Product\Type\Simple`
- * itself is never edited. Both overrides are no-ops unless the submitted
- * cart data carries `vendor_product_id`, so every non-marketplace Simple
- * product (B2C and B2B alike) behaves exactly as before.
+ * itself is never edited. Every override is a no-op unless the submitted/
+ * stored cart data carries `additional.marketplace`, so every
+ * non-marketplace Simple product (B2C and B2B alike) behaves exactly as
+ * before.
+ *
+ * `additional.marketplace` shape (both `cart_items.additional` and, once
+ * copied through at checkout, `order_items.additional` — see
+ * OrderItemResource, unmodified):
+ *
+ *   [
+ *       'vendor_product_id' => int,
+ *       'vendor_id'         => int,
+ *       'vendor_name'       => string,  // snapshot — vendor may rename later
+ *       'vendor_sku'        => ?string, // snapshot — vendor may re-SKU later
+ *       'vendor_price'      => float,   // snapshot — redundant with price/base_price,
+ *                                       // kept explicit so order-processing code never
+ *                                       // has to guess which price column is "the vendor's"
+ *   ]
  */
 class MarketplaceAwareSimple extends Simple
 {
@@ -24,8 +41,8 @@ class MarketplaceAwareSimple extends Simple
      */
     public function compareOptions($options1, $options2)
     {
-        $vendorProductId1 = $options1['vendor_product_id'] ?? null;
-        $vendorProductId2 = $options2['vendor_product_id'] ?? null;
+        $vendorProductId1 = $options1['marketplace']['vendor_product_id'] ?? null;
+        $vendorProductId2 = $options2['marketplace']['vendor_product_id'] ?? null;
 
         if ($vendorProductId1 !== $vendorProductId2) {
             return false;
@@ -39,7 +56,8 @@ class MarketplaceAwareSimple extends Simple
      * check, shape of the cart-item array) unchanged, then — only for a
      * marketplace add — overwrites the price-derived fields with
      * `VendorProduct.price` instead of `getFinalPrice()`'s base/customer-group/
-     * catalog-rule price. The vendor's price is never taken from the request.
+     * catalog-rule price, and stores the purchase-time vendor snapshot. The
+     * vendor's price is never taken from the request.
      */
     public function prepareForCart($data)
     {
@@ -52,7 +70,7 @@ class MarketplaceAwareSimple extends Simple
             return $products;
         }
 
-        $vendorProduct = VendorProduct::find($data['vendor_product_id']);
+        $vendorProduct = VendorProduct::with('vendor')->find($data['vendor_product_id']);
 
         if (! $vendorProduct) {
             return $products;
@@ -71,28 +89,60 @@ class MarketplaceAwareSimple extends Simple
         $products[0]['base_total'] = $basePrice * $quantity;
         $products[0]['base_total_incl_tax'] = $basePrice * $quantity;
 
+        $products[0]['additional']['marketplace'] = [
+            'vendor_product_id' => $vendorProduct->id,
+            'vendor_id' => $vendorProduct->vendor_id,
+            'vendor_name' => $vendorProduct->vendor?->name,
+            'vendor_sku' => $vendorProduct->vendor_sku,
+            'vendor_price' => $basePrice,
+        ];
+
         return $products;
     }
 
     /**
-     * `Cart::collectTotals()` calls this on every cart read/update and, by
-     * default, recomputes the item's price fresh from `getFinalPrice()` —
-     * which would silently overwrite the vendor's price set in
-     * `prepareForCart()` above with Bagisto's own base/customer-group price
-     * the very next time the cart page loads. For a marketplace item the
-     * vendor's price is authoritative and must survive every reload, so
-     * this skips the recomputation entirely (still runs the inactive-item
-     * check). Non-marketplace items are unaffected (parent behavior).
+     * `Cart::collectTotals()` (and therefore `Cart::validateItems()`, called
+     * at the top of checkout's `storeOrder()`) calls this on every cart
+     * read/update. Two marketplace-specific concerns live here:
+     *
+     * 1. The stock implementation unconditionally *recomputes* the item's
+     *    price from `getFinalPrice()` (Bagisto's own base/customer-group/
+     *    catalog-rule price), which would silently overwrite the vendor's
+     *    price set in `prepareForCart()` the very next time the cart page
+     *    loaded. Skipped entirely for marketplace items — the vendor's
+     *    snapshotted price is authoritative and must survive every reload.
+     * 2. The vendor/offer that was valid at add-to-cart time may have gone
+     *    inactive, or no longer have enough quantity, by the time checkout
+     *    runs. Re-checked here so `Cart::validateItems()`'s existing
+     *    "remove inactive items before placing the order" behavior also
+     *    covers marketplace offers — no separate checkout validation step
+     *    was needed.
      */
     public function validateCartItem(CartItem $item): CartItemValidationResult
     {
-        if (empty($item->additional['vendor_product_id'])) {
+        $vendorProductId = $item->additional['marketplace']['vendor_product_id'] ?? null;
+
+        if (! $vendorProductId) {
             return parent::validateCartItem($item);
         }
 
         $validation = new CartItemValidationResult;
 
         if ($this->isCartItemInactive($item)) {
+            $validation->itemIsInactive();
+
+            return $validation;
+        }
+
+        $vendorProduct = VendorProduct::with('vendor')->find($vendorProductId);
+
+        if (
+            ! $vendorProduct
+            || $vendorProduct->status !== VendorProductStatus::ACTIVE
+            || ! $vendorProduct->vendor
+            || $vendorProduct->vendor->status !== VendorStatus::ACTIVE
+            || $item->quantity > $vendorProduct->quantity
+        ) {
             $validation->itemIsInactive();
         }
 
