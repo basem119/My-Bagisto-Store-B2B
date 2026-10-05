@@ -55,4 +55,21 @@ return [
             'remove-btn' => 'Remove',
         ],
     ],
+    'shop' => [
+        'index' => [
+            'title' => 'Marketplace',
+            'from' => 'From',
+            'vendor-count' => '{1} :count vendor|[2,*] :count vendors',
+            'empty' => 'No marketplace products found.',
+        ],
+        'show' => [
+            'categories' => 'Categories',
+            'offers-title' => 'Available Sellers',
+            'no-offers' => 'No vendor offers are currently available for this product.',
+            'vendor' => 'Vendor',
+            'vendor-sku' => 'Vendor SKU',
+            'price' => 'Price',
+            'quantity' => 'Available Quantity',
+        ],
+    ],
 ];

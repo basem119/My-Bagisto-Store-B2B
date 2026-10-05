@@ -343,7 +343,69 @@ package in this repository (including the custom `Paymob` package), registered t
 — a `path` Composer repository + a `ModuleServiceProvider` listed in `config/concord.php`'s
 `modules` array. No new structural convention was invented.
 
-## 14. Rejected alternatives
+## 15. Marketplace Product Discovery / Storefront (Phase 8)
+
+A public, read-only composition layer over the unchanged Phase 5/7 schema — zero migrations.
+Adds `Services/ProductDiscoveryService`, `Http/Controllers/Shop/MarketplaceController`,
+`Routes/storefront-routes.php` (`/marketplace`, `/marketplace/products/{urlKey}`), and two
+Blade views (`shop/index`, `shop/show`). No `customer` guard middleware — mirrors Bagisto's
+own public product/category browsing (confirmed via `store-front-routes.php`: product/
+category pages carry no auth requirement).
+
+### Eligibility rule (and a deliberate deviation from core Bagisto)
+
+A product is marketplace-discoverable only when, for the **current channel + locale**:
+
+```
+product_flat.status = 1          (product enabled — reused verbatim from core)
+AND vendor_product.status = active
+AND vendor_product.quantity > 0   (see Inventory boundary below)
+AND vendor.status = active
+```
+
+**Deliberately does NOT also require `product_flat.visible_individually = 1`.** That flag is
+core Bagisto's OWN "should this appear standalone in Bagisto's native catalog/search" signal,
+and is `0` for every configurable-variant child product (verified directly against seeded
+data: every `products` row with a non-null `parent_id` has `visible_individually = 0` in its
+`product_flat` row). Phase 7 already established that vendors attach `VendorProduct` offers
+to *concrete sellable* products — which, for configurable items, are necessarily the variant
+rows (Phase 7 explicitly rejects attaching an offer directly to a configurable *parent*).
+Requiring `visible_individually = 1` would therefore silently exclude almost every real-world
+vendor offer from marketplace discovery. Marketplace discovery is an **additive, independent
+view** driven by "does an eligible vendor offer exist for this product_id", not a duplicate of
+core Bagisto's own catalog browsing — so reusing that specific flag does not apply here, only
+`status` does. This was discovered by inspecting seeded `product_flat` rows, not assumed.
+
+### Product deduplication
+
+The listing query is `GROUP BY product_id`, never one row per `VendorProduct` — verified with
+an explicit test (two active vendors offering the same product still produce exactly one
+listing row, with `MIN(price)` as the displayed "from" price and `COUNT(DISTINCT vendor_id)`
+as the vendor count). Sorting/display never reads a single arbitrary joined `VendorProduct`
+row's price — only the aggregate.
+
+### Pricing boundary (unchanged)
+
+The listing's "from price" and the detail page's per-offer prices are plain reads of
+`VendorProduct.price` — no precedence logic, no composition with `product_customer_group_prices`
+or B2B Company Catalog pricing, no RFQ integration. `product_customer_group_prices` is never
+queried or modified by this service.
+
+### Inventory boundary (unchanged)
+
+`VendorProduct.quantity = 0` means **hidden from discovery entirely**, not "visible but
+unavailable" — a deliberate, documented choice for this foundation phase (there is no cart/
+checkout yet to meaningfully show an unavailable offer against), not a new inventory system.
+`product_inventories.vendor_id` is never read by this service, consistent with the Phase 6.x
+audit's instruction that it must not be interpreted as marketplace vendor ownership.
+
+### Vendor identity (minimal, by design)
+
+No dedicated public vendor profile page was built — only `vendor.name` is surfaced inline
+next to each offer on the product detail page, satisfying "a simple vendor identity/display
+is sufficient" without building the explicitly-deferred full vendor storefront.
+
+## 16. Rejected alternatives
 
 - **Vendor = Company subtype** — rejected outright per explicit instruction; also wrong
   domain modeling (buyer organization ≠ seller organization).
@@ -368,16 +430,24 @@ package in this repository (including the custom `Paymob` package), registered t
   middleware now trusts the already-resolved `Vendor` instance instead of re-querying by a
   raw slug string pulled off the route.
 
-## Deferred (explicitly NOT built in Phase 5 or Phase 6)
+## Deferred (explicitly NOT built in Phase 5, 6, 7, or 8)
 
-Vendor storefront (public-facing frontend), vendor product/catalog management UI, vendor
-pricing UI, vendor inventory management UI, multi-vendor cart, marketplace checkout,
-parent/vendor orders, fulfillment, RFQ marketplace integration, independent PO, commissions,
-settlements, lifecycle notifications beyond the current set (application-received,
-status-changed), GraphQL marketplace API, ownership transfer, final
+Vendor pricing precedence/composition engine, multi-vendor cart, cart vendor selection,
+marketplace checkout, parent/vendor orders, fulfillment, RFQ marketplace integration,
+independent PO, commissions, settlements, payouts, GraphQL marketplace API, ownership
+transfer, full public vendor storefront/profile pages, marketplace-specific price sorting
+(deferred — current listing sorts by name; if lowest-price sorting is added later it must
+use the same `MIN(price)` aggregate already used for display, never a raw joined row), final
 security/regression/performance/payment E2E testing.
 
-Phase 6 additionally resolved (no longer deferred, see Section 11): vendor onboarding HTTP
-flow, admin vendor lifecycle management HTTP, Vendor Portal foundation (dashboard/profile/
-team), vendor-scoped HTTP authorization middleware, active-membership enforcement in
-`VendorPolicy`, lifecycle notifications for application/status-change events.
+Phase 6 resolved: vendor onboarding HTTP flow, admin vendor lifecycle management HTTP,
+Vendor Portal foundation (dashboard/profile/team), vendor-scoped HTTP authorization
+middleware, active-membership enforcement in `VendorPolicy`, lifecycle notifications.
+
+Phase 7 resolved: vendor offer (VendorProduct) CRUD via the vendor portal, admin offer
+oversight, product-eligibility validation for attaching offers, cross-vendor offer-ownership
+enforcement.
+
+Phase 8 resolved: public marketplace product discovery/listing, product detail page with all
+eligible vendor offers, product deduplication across multiple vendor offers, category/vendor/
+search filtering, pagination.
