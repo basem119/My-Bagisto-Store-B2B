@@ -867,3 +867,11 @@ creation (core shipment architecture is coupled to platform-level inventory sour
 vendor-owned) rather than fake or duplicate it.
 
 Phase 12A resolved: the reusable Marketplace financial ledger foundation with immutable transaction headers and debit/credit entries (two new tables), fixed account codes, EGP-only monetary handling with DECIMAL(18,4) storage and integer minor-unit arithmetic, atomic posting, and race-safe idempotency. Corrections are explicitly modeled as reversing transactions rather than mutations or deletes. The ledger is intentionally a foundation only: order financialization, company fees, commissions, payments, B2B credit integration, refunds, cancellations, settlements, vendor platform fees, and guarantee workflows remain deferred to later phases.
+
+Phase 12C resolved
+
+Phase 12C resolved: the B2B credit and payment-plan foundation is now implemented and committed. The Marketplace reuses the existing B2B Suite company-credit system rather than introducing a duplicate credit model, while adding company payment policies, order payment plans, installments, manual payments, and payment allocations. Credit exposure is validated against the existing company credit limit with row locking, exact four-decimal monetary comparisons, and enforcement of the Marketplace hard credit limit regardless of allow_exceed_limit. Payment plans snapshot approved terms and are idempotent; payment allocation is atomic, company-scoped, and rejects overpayment and advance/customer-wallet credit. paybycredit orders create their payment plans within Bagisto's order-creation transaction, while the existing B2B Suite listener remains responsible for the single purchase-credit mutation. The phase adds no admin UI/routes; the functionality is currently service-driven. Overdue marking is available as a service operation but is not scheduled. Refunds, cancellations, vendor settlements, vendor platform fees, wallet credit, provider changes, and Phase 12D remain deferred.
+
+Validation: 47 Marketplace Feature tests passed with 158 assertions. Phase 12C PHP files passed Pint; editor diagnostics reported no errors. Broader Pint findings are limited to pre-existing issues in untouched files.
+
+Commit: 5c3828a — feat(marketplace): add b2b credit and payment plans
