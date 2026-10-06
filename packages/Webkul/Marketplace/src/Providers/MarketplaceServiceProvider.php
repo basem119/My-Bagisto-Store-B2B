@@ -9,6 +9,7 @@ use Illuminate\Support\ServiceProvider;
 use Webkul\Marketplace\Http\Middleware\EnsureVendorContext;
 use Webkul\Marketplace\Listeners\AllocateCompanyFeeToInvoice;
 use Webkul\Marketplace\Listeners\ApplyCompanyPlatformFeeToCart;
+use Webkul\Marketplace\Listeners\CreateMarketplacePaymentPlan;
 use Webkul\Marketplace\Listeners\FinancializeMarketplaceOrder;
 use Webkul\Marketplace\Listeners\RevalidateVendorOfferQuantity;
 use Webkul\Marketplace\Models\Vendor;
@@ -56,6 +57,7 @@ class MarketplaceServiceProvider extends ServiceProvider
         Event::listen('checkout.cart.update.before', RevalidateVendorOfferQuantity::class);
         Event::listen('checkout.cart.collect.totals.after', ApplyCompanyPlatformFeeToCart::class);
         Event::listen('checkout.order.save.after', FinancializeMarketplaceOrder::class);
+        Event::listen('checkout.order.save.after', CreateMarketplacePaymentPlan::class);
         Event::listen('sales.invoice.save.after', AllocateCompanyFeeToInvoice::class);
 
         /**
