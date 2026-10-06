@@ -866,3 +866,4 @@ oversight page, and an explicit, justified decision to defer vendor-initiated sh
 creation (core shipment architecture is coupled to platform-level inventory sources, not
 vendor-owned) rather than fake or duplicate it.
 
+Phase 12A resolved: the reusable Marketplace financial ledger foundation with immutable transaction headers and debit/credit entries (two new tables), fixed account codes, EGP-only monetary handling with DECIMAL(18,4) storage and integer minor-unit arithmetic, atomic posting, and race-safe idempotency. Corrections are explicitly modeled as reversing transactions rather than mutations or deletes. The ledger is intentionally a foundation only: order financialization, company fees, commissions, payments, B2B credit integration, refunds, cancellations, settlements, vendor platform fees, and guarantee workflows remain deferred to later phases.

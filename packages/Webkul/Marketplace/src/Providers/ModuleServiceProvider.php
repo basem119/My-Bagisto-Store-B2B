@@ -3,6 +3,8 @@
 namespace Webkul\Marketplace\Providers;
 
 use Webkul\Core\Providers\CoreModuleServiceProvider;
+use Webkul\Marketplace\Models\FinancialEntry;
+use Webkul\Marketplace\Models\FinancialTransaction;
 use Webkul\Marketplace\Models\Vendor;
 use Webkul\Marketplace\Models\VendorProduct;
 use Webkul\Marketplace\Models\VendorStatusHistory;
@@ -20,6 +22,8 @@ class ModuleServiceProvider extends CoreModuleServiceProvider
         VendorStatusHistory::class,
         VendorUser::class,
         VendorProduct::class,
+        FinancialTransaction::class,
+        FinancialEntry::class,
     ];
 
     /**

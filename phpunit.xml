@@ -25,6 +25,11 @@
         <testsuite name="Shop Feature Test">
             <directory suffix="Test.php">packages/Webkul/Shop/tests/Feature</directory>
         </testsuite>
+
+        <!-- Marketplace financial foundation tests. -->
+        <testsuite name="Marketplace Feature Test">
+            <directory suffix="Test.php">packages/Webkul/Marketplace/tests/Feature</directory>
+        </testsuite>
     </testsuites>
 
     <source>
