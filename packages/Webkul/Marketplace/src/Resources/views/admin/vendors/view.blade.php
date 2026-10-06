@@ -16,6 +16,29 @@
         <dd>{{ $vendor->phone }}</dd>
     </dl>
 
+    @if (bouncer()->hasPermission('marketplace.vendors.commission'))
+        <form method="POST" action="{{ route('marketplace.admin.vendors.commission', $vendor->id) }}" class="mb-8 flex max-w-xl items-end gap-3">
+            @csrf
+            <x-admin::form.control-group class="flex-1">
+                <x-admin::form.control-group.label for="commission_rate">
+                    @lang('marketplace::app.admin.vendors.view.commission-rate')
+                </x-admin::form.control-group.label>
+
+                <x-admin::form.control-group.control
+                    type="text"
+                    id="commission_rate"
+                    name="commission_rate"
+                    :value="old('commission_rate', $vendor->commission_rate)"
+                    :placeholder="trans('marketplace::app.admin.vendors.view.use-default-rate')"
+                />
+
+                <x-admin::form.control-group.error control-name="commission_rate" />
+            </x-admin::form.control-group>
+
+            <button type="submit" class="primary-button">@lang('marketplace::app.admin.vendors.view.save-commission-rate')</button>
+        </form>
+    @endif
+
     <div class="mb-8 flex gap-4">
         @if ($vendor->status->canTransitionTo(\Webkul\Marketplace\Enums\VendorStatus::ACTIVE) && $vendor->status->value === 'pending')
             <form method="POST" action="{{ route('marketplace.admin.vendors.approve', $vendor->id) }}">

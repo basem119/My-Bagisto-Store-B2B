@@ -35,6 +35,7 @@ class Vendor extends Model implements VendorContract
         'meta_keywords',
         'approved_at',
         'suspended_at',
+        'commission_rate',
     ];
 
     /**
@@ -46,6 +47,7 @@ class Vendor extends Model implements VendorContract
         'status' => VendorStatus::class,
         'approved_at' => 'datetime',
         'suspended_at' => 'datetime',
+        'commission_rate' => 'decimal:4',
     ];
 
     public function users(): HasMany

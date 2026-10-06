@@ -17,6 +17,11 @@ return [
         'route' => 'marketplace.admin.vendors.view',
         'sort' => 1,
     ], [
+        'key' => 'marketplace.vendors.commission',
+        'name' => 'marketplace::app.admin.acl.commission',
+        'route' => 'marketplace.admin.vendors.commission',
+        'sort' => 2,
+    ], [
         'key' => 'marketplace.vendors.approve',
         'name' => 'marketplace::app.admin.acl.approve',
         'route' => 'marketplace.admin.vendors.approve',

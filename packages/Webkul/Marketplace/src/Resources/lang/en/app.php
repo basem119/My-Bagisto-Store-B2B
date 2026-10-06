@@ -12,6 +12,18 @@ return [
             'reactivate' => 'Reactivate',
             'vendor-products' => 'Vendor Products',
             'vendor-orders' => 'Vendor Orders',
+            'commission' => 'Manage Vendor Commission',
+        ],
+        'system' => [
+            'marketplace' => [
+                'title' => 'Marketplace',
+                'financial' => [
+                    'title' => 'Financial Settings',
+                    'info' => 'Configure the global company fee and default vendor commission.',
+                    'company-fee-rate' => 'Company platform fee rate (%)',
+                    'default-vendor-commission-rate' => 'Default vendor commission rate (%)',
+                ],
+            ],
         ],
         'vendors' => [
             'index' => [
@@ -23,6 +35,10 @@ return [
                 'reject-btn' => 'Reject',
                 'suspend-btn' => 'Suspend',
                 'reactivate-btn' => 'Reactivate',
+                'commission-rate' => 'Commission rate (%)',
+                'use-default-rate' => 'Use platform default',
+                'save-commission-rate' => 'Save rate',
+                'commission-rate-updated' => 'Vendor commission rate updated.',
             ],
         ],
         'vendor-products' => [
@@ -35,6 +51,9 @@ return [
                 'title' => 'Vendor Orders',
                 'empty' => 'No marketplace order items yet.',
             ],
+        ],
+        'invoices' => [
+            'company-fee' => 'Company platform fee',
         ],
         'order-item' => [
             'title' => 'Marketplace Offer',
@@ -91,6 +110,9 @@ return [
         ],
     ],
     'shop' => [
+        'checkout' => [
+            'company-fee' => 'Company platform fee',
+        ],
         'index' => [
             'title' => 'Marketplace',
             'from' => 'From',

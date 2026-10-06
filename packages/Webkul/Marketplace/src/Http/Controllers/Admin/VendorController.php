@@ -2,6 +2,7 @@
 
 namespace Webkul\Marketplace\Http\Controllers\Admin;
 
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Webkul\Admin\Http\Controllers\Controller;
 use Webkul\Marketplace\Http\Requests\VendorStatusActionRequest;
@@ -64,6 +65,20 @@ class VendorController extends Controller
         $this->vendorService->reactivate($vendor, $this->currentAdminId(), $request->validated('note'));
 
         return redirect()->route('marketplace.admin.vendors.view', $vendor->id)->with('success', 'Vendor reactivated.');
+    }
+
+    public function updateCommissionRate(Request $request, Vendor $vendor)
+    {
+        $data = $request->validate([
+            'commission_rate' => ['nullable', 'numeric', 'min:0', 'max:100'],
+        ]);
+
+        $vendor->update([
+            'commission_rate' => $data['commission_rate'] ?? null,
+        ]);
+
+        return redirect()->route('marketplace.admin.vendors.view', $vendor->id)
+            ->with('success', trans('marketplace::app.admin.vendors.view.commission-rate-updated'));
     }
 
     protected function currentAdminId(): ?int

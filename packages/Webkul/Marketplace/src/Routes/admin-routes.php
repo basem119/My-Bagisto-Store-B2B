@@ -24,6 +24,8 @@ Route::group(['middleware' => ['admin', NoCacheMiddleware::class], 'prefix' => c
         Route::post('{vendor}/suspend', 'suspend')->name('marketplace.admin.vendors.suspend');
 
         Route::post('{vendor}/reactivate', 'reactivate')->name('marketplace.admin.vendors.reactivate');
+
+        Route::post('{vendor}/commission', 'updateCommissionRate')->name('marketplace.admin.vendors.commission');
     });
 
     Route::get('vendor-products', [VendorProductController::class, 'index'])->name('marketplace.admin.vendor-products.index');
